@@ -4,6 +4,7 @@ library(tidyr)
 library(ggplot2)
 library(ggseg)
 library(shinythemes)
+library(svglite)
 library(RSQLite)
 
 # Connect to the SQLite database
@@ -65,7 +66,10 @@ ui <- fluidPage(theme = shinytheme("flatly"),
     titlePanel("Gene Expression in Human Developmental Brain"),
     sidebarLayout(
         sidebarPanel(
-            selectizeInput("gene", "Select Gene:", choices = NULL, selected = "GFAP")
+            helpText("Start typing a HGNC gene name to see its expression across developmental stages"),
+            selectizeInput("gene", "Select Gene:", choices = NULL, selected = "GFAP"),
+            downloadButton("downloadSVG", "Download SVG"),
+            downloadButton("downloadTIFF", "Download TIFF")
         ),
         mainPanel(
             tabsetPanel(
@@ -91,7 +95,7 @@ ui <- fluidPage(theme = shinytheme("flatly"),
 server <- function(input, output, session) {
     updateSelectizeInput(session, "gene", choices = gene_list, server = TRUE)
 
-    output$brainPlot <- renderPlot({
+    brainPlotObject <- reactive({
         gene <- input$gene
 
         query <- paste0(
@@ -126,7 +130,6 @@ server <- function(input, output, session) {
             ) +
             labs(
                 fill = "Log2(RPKM + 1)",
-                title = paste0("Human Developmental brain RNAseq - ", gene)
             ) +
             facet_wrap(
                 ~ factor(broad_age, unique(age_df$broad_age)),
@@ -136,11 +139,32 @@ server <- function(input, output, session) {
             theme(
                 strip.text = element_text(size = 18),
                 legend.position = "bottom",
-                title = element_text(size = 24),
-                plot.title = element_text(hjust = .5, vjust = 1),
+                plot.background = element_rect(fill = "white", colour = NA),
                 legend.text = element_text(size = 12)
             )
     })
+
+    output$brainPlot <- renderPlot({
+        brainPlotObject()
+    })
+
+    output$downloadSVG <- downloadHandler(
+        filename = function() {
+            paste0("brain_plot-", input$gene, ".svg")
+        },
+        content = function(file) {
+            ggsave(file, plot = brainPlotObject(), device = "svg", width = 10, height = 12)
+        }
+    )
+
+    output$downloadTIFF <- downloadHandler(
+        filename = function() {
+            paste0("brain_plot-", input$gene, ".tiff")
+        },
+        content = function(file) {
+            ggsave(file, plot = brainPlotObject(), device = "tiff", width = 10, height = 12, dpi = 300)
+        }
+    )
 
     output$dkPlot <- renderPlot({
         plot(dk) +
