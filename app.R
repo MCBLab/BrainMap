@@ -94,9 +94,8 @@ ui <- navbarPage(
             h3("About This App"),
             p("This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."),
             p("The data is sourced from the",
-                a("BrainSpan Atlas of the Developing Human Brain", href = "https://www.brainspan.org/"),
+                a("BrainSpan Atlas of the Developing Human Brain",  target = "_blank", href = "https://www.brainspan.org/"),
                 "."),
-            p("The app was refactored to use a SQLite database for improved performance."),
             h4("Brain Regions Reference"),
             plotOutput("dkPlot", height = "500px")
         )
@@ -105,7 +104,7 @@ ui <- navbarPage(
     # Footer
     tags$footer(
         style = "position: fixed; bottom: 0; width: 100%; height: 50px; background-color: #f5f5f5; text-align: center; padding: 15px;",
-        a(href = "https://mcblab.github.io/", "Made by MCB Lab at UFRN")
+        a(href = "https://mcblab.github.io/", target = "_blank", "Made by MCB Lab at UFRN")
     )
 )
 
