@@ -62,32 +62,50 @@ age_df <- data.frame(age = ages, broad_age = age_mapping, stringsAsFactors = FAL
 
 
 # UI
-ui <- fluidPage(theme = shinytheme("flatly"),
-    titlePanel("Gene Expression in Human Developmental Brain"),
-    sidebarLayout(
-        sidebarPanel(
-            helpText("Start typing a HGNC gene name to see its expression across developmental stages"),
-            selectizeInput("gene", "Select Gene:", choices = NULL, selected = "GFAP"),
-            downloadButton("downloadSVG", "Download SVG"),
-            downloadButton("downloadTIFF", "Download TIFF")
-        ),
-        mainPanel(
-            tabsetPanel(
-                tabPanel("Brain Plot", plotOutput("brainPlot", height = "1200px")),
-                tabPanel("About", 
-                         mainPanel(
-                           h3("About This App"),
-                           p("This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."),
-                           p("The data is sourced from the",
-                             a("BrainSpan Atlas of the Developing Human Brain", href = "https://www.brainspan.org/"),
-                             "."),
-                           p("The app was refactored to use a SQLite database for improved performance."),
-                           h4("Brain Regions Reference"),
-                           plotOutput("dkPlot", height = "500px")
-                         )
-                )
+ui <- navbarPage(
+    title = "Gene Expression in Human Developmental Brain",
+    theme = shinytheme("cerulean"),
+    
+    tags$head(
+        tags$link(rel = "stylesheet", type = "text/css", href = "https://fonts.googleapis.com/css?family=Lato"),
+        tags$style(HTML("
+            .navbar-brand {
+                font-family: 'Lato', sans-serif;
+                font-weight: 500;
+            }
+        "))
+    ),
+    
+    tabPanel("App",
+        sidebarLayout(
+            sidebarPanel(
+                helpText("Start typing a HGNC gene name to see its expression across developmental stages"),
+                selectizeInput("gene", "Select Gene:", choices = NULL, selected = "GFAP"),
+                downloadButton("downloadSVG", "Download SVG"),
+                downloadButton("downloadTIFF", "Download TIFF")
+            ),
+            mainPanel(
+                plotOutput("brainPlot", height = "1200px")
             )
         )
+    ),
+    tabPanel("About", 
+        mainPanel(
+            h3("About This App"),
+            p("This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."),
+            p("The data is sourced from the",
+                a("BrainSpan Atlas of the Developing Human Brain", href = "https://www.brainspan.org/"),
+                "."),
+            p("The app was refactored to use a SQLite database for improved performance."),
+            h4("Brain Regions Reference"),
+            plotOutput("dkPlot", height = "500px")
+        )
+    ),
+    
+    # Footer
+    tags$footer(
+        style = "position: fixed; bottom: 0; width: 100%; height: 50px; background-color: #f5f5f5; text-align: center; padding: 15px;",
+        a(href = "https://mcblab.github.io/", "Made by MCB Lab at UFRN")
     )
 )
 
@@ -96,6 +114,7 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "gene", choices = gene_list, server = TRUE)
 
     brainPlotObject <- reactive({
+        req(input$gene)
         gene <- input$gene
 
         query <- paste0(
@@ -104,6 +123,14 @@ server <- function(input, output, session) {
             "'"
         )
         gene_data <- dbGetQuery(con, query)
+        
+        if (nrow(gene_data) == 0) {
+            return(
+                ggplot() +
+                annotate("text", x = 0.5, y = 0.5, label = "Data not available for this gene", size = 8) +
+                theme_void()
+            )
+        }
 
         # We need to read the columns_metadata table to join with the expression data
         columns_metadata <- dbReadTable(con, "columns_metadata")
@@ -125,7 +152,7 @@ server <- function(input, output, session) {
                 mapping = aes(fill = log2(expression_value + 1))
             ) +
             scale_fill_gradientn(
-                colours = c("royalblue", "firebrick", "goldenrod"),
+                colours = c("royalblue","firebrick","goldenrod"),
                 na.value = "white"
             ) +
             labs(
@@ -181,6 +208,5 @@ server <- function(input, output, session) {
         dbDisconnect(con)
     })
 }
-
 # Run the application 
 shinyApp(ui = ui, server = server)
