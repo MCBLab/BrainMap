@@ -6,7 +6,6 @@ library(ggplot2)
 library(ggseg)
 
 # Path to working directory
-setwd("/path/to/your/working/directory")
 gene = "GFAP"
 
 
