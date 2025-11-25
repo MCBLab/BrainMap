@@ -5,13 +5,24 @@ library(ggplot2)
 library(ggseg)
 library(shinythemes)
 library(svglite)
-library(RSQLite)
+library(vroom)
+# library(RSQLite)
 
-# Connect to the SQLite database
-con <- dbConnect(RSQLite::SQLite(), "brain_data.sqlite")
+# # Connect to the SQLite database
+# con <- dbConnect(RSQLite::SQLite(), "brain_data.sqlite")
+# 
+# # Get gene list from the database
+# gene_list <- dbGetQuery(con, "SELECT DISTINCT gene_symbol FROM rows_metadata")$gene_symbol
+# Get gene list from the CSV file
+rows <- vroom::vroom("genes_matrix_csv/rows_metadata.csv")
+columns <- vroom::vroom("genes_matrix_csv/columns_metadata.csv")
+gene_list <- unique(rows$gene_symbol)
 
-# Get gene list from the database
-gene_list <- dbGetQuery(con, "SELECT DISTINCT gene_symbol FROM rows_metadata")$gene_symbol
+# Read and assemble the expression data
+counts <- vroom::vroom("genes_matrix_csv/expression_matrix.csv", col_names = FALSE) %>% select(-1)
+colnames(counts) <- columns$column_num
+counts <- cbind(rows, counts)
+
 
 # Mapping dataframes
 input_values <- c(NA, "bankssts", "caudal middle frontal", "fusiform", "inferior parietal", 
@@ -120,13 +131,9 @@ server <- function(input, output, session) {
     brainPlotObject <- reactive({
         req(input$gene)
         gene <- input$gene
-
-        query <- paste0(
-            "SELECT * FROM expression WHERE gene_symbol = '",
-            gene,
-            "'"
-        )
-        gene_data <- dbGetQuery(con, query)
+        
+        # The `counts` data frame now holds all the data
+        gene_data <- counts[counts$gene_symbol == gene, ]
         
         if (nrow(gene_data) == 0) {
             return(
@@ -136,18 +143,25 @@ server <- function(input, output, session) {
             )
         }
 
-        # We need to read the columns_metadata table to join with the expression data
-        columns_metadata <- dbReadTable(con, "columns_metadata")
-
-        gene_data %>%
-            merge(
-                .,
-                columns_metadata,
-                by.x = "column_num",
-                by.y = "column_num"
+        # Reshape the data to a long format
+        # The columns to pivot are the ones that are not in rows_metadata
+        row_metadata_cols <- colnames(rows)
+        gene_data_long <- gene_data %>%
+            pivot_longer(
+                cols = -all_of(row_metadata_cols),
+                names_to = "column_num", 
+                values_to = "expression_value"
             ) %>%
-            merge(mapping_df, ., by = "structure_name") %>%
-            merge(age_df, ., by = "age") %>%
+            mutate(column_num = as.integer(column_num)) %>%
+            select(column_num, expression_value)
+
+        # Join with metadata
+        plot_data <- gene_data_long %>%
+            left_join(columns, by = "column_num") %>%
+            left_join(mapping_df, by = "structure_name") %>%
+            left_join(age_df, by = "age")
+
+        plot_data %>%
             group_by(broad_age) %>%
             ggseg(
                 .data = .,
@@ -208,9 +222,9 @@ server <- function(input, output, session) {
             )
     })
 
-    session$onSessionEnded(function() {
-        dbDisconnect(con)
-    })
+    # session$onSessionEnded(function() {
+    #     dbDisconnect(con)
+    # })
 }
 # Run the application 
 shinyApp(ui = ui, server = server)
