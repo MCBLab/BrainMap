@@ -3,18 +3,14 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(ggseg)
-library(shinythemes) # Added shinythemes library
+library(shinythemes)
+library(RSQLite)
 
-# Load data
-columns <- read.csv("genes_matrix_csv/columns_metadata.csv", header = T)
-counts <- read.csv("genes_matrix_csv/expression_matrix.csv", header = F)[,-1]
-rows <- read.csv("genes_matrix_csv/rows_metadata.csv", header = T)
+# Connect to the SQLite database
+con <- dbConnect(RSQLite::SQLite(), "brain_data.sqlite")
 
-colnames(counts) = columns$column_num
-counts = cbind(rows, counts)
-
-# Get gene list
-gene_list <- unique(rows$gene_symbol)
+# Get gene list from the database
+gene_list <- dbGetQuery(con, "SELECT DISTINCT gene_symbol FROM rows_metadata")$gene_symbol
 
 # Mapping dataframes
 input_values <- c(NA, "bankssts", "caudal middle frontal", "fusiform", "inferior parietal", 
@@ -65,14 +61,28 @@ age_df <- data.frame(age = ages, broad_age = age_mapping, stringsAsFactors = FAL
 
 
 # UI
-ui <- fluidPage(theme = shinytheme("flatly"), # Applied "flatly" theme
+ui <- fluidPage(theme = shinytheme("flatly"),
     titlePanel("Gene Expression in Human Developmental Brain"),
     sidebarLayout(
         sidebarPanel(
             selectizeInput("gene", "Select Gene:", choices = NULL, selected = "GFAP")
         ),
         mainPanel(
-            plotOutput("brainPlot", height = "1200px") # Increased height for vertical facets
+            tabsetPanel(
+                tabPanel("Brain Plot", plotOutput("brainPlot", height = "1200px")),
+                tabPanel("About", 
+                         mainPanel(
+                           h3("About This App"),
+                           p("This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."),
+                           p("The data is sourced from the",
+                             a("BrainSpan Atlas of the Developing Human Brain", href = "https://www.brainspan.org/"),
+                             "."),
+                           p("The app was refactored to use a SQLite database for improved performance."),
+                           h4("Brain Regions Reference"),
+                           plotOutput("dkPlot", height = "500px")
+                         )
+                )
+            )
         )
     )
 )
@@ -83,17 +93,68 @@ server <- function(input, output, session) {
 
     output$brainPlot <- renderPlot({
         gene <- input$gene
-        
-        counts %>% filter(gene_symbol == gene) %>% select(-c(gene_id, ensembl_gene_id, gene_symbol, entrez_id)) %>%
-          pivot_longer(!row_num) %>% merge(., columns, by.x = "name", by.y = "column_num") %>%
-          merge(mapping_df, ., by = "structure_name") %>%
-          merge(age_df, ., by = "age") %>%
-          group_by(broad_age) %>%
-          ggseg(.data=., hemisphere = "left", colour = "black", mapping = aes(fill = log2(value+1))) +
-          scale_fill_gradientn(colours = c("royalblue","firebrick","goldenrod"),na.value="white")  +
-          labs(fill = "Log2(RPKM + 1)", title = paste0("Human Developmental brain RNAseq - ", gene)) +
-          facet_wrap(~factor(broad_age, unique(age_df$broad_age)), nrow = 5) + theme_void() + # Changed ncol to nrow
-          theme(strip.text = element_text(size = 18), legend.position = "bottom", title = element_text(size = 24), plot.title = element_text(hjust = .5, vjust = 1))
+
+        query <- paste0(
+            "SELECT * FROM expression WHERE gene_symbol = '",
+            gene,
+            "'"
+        )
+        gene_data <- dbGetQuery(con, query)
+
+        # We need to read the columns_metadata table to join with the expression data
+        columns_metadata <- dbReadTable(con, "columns_metadata")
+
+        gene_data %>%
+            merge(
+                .,
+                columns_metadata,
+                by.x = "column_num",
+                by.y = "column_num"
+            ) %>%
+            merge(mapping_df, ., by = "structure_name") %>%
+            merge(age_df, ., by = "age") %>%
+            group_by(broad_age) %>%
+            ggseg(
+                .data = .,
+                hemisphere = "left",
+                colour = "black",
+                mapping = aes(fill = log2(expression_value + 1))
+            ) +
+            scale_fill_gradientn(
+                colours = c("royalblue", "firebrick", "goldenrod"),
+                na.value = "white"
+            ) +
+            labs(
+                fill = "Log2(RPKM + 1)",
+                title = paste0("Human Developmental brain RNAseq - ", gene)
+            ) +
+            facet_wrap(
+                ~ factor(broad_age, unique(age_df$broad_age)),
+                nrow = 5
+            ) +
+            theme_void() +
+            theme(
+                strip.text = element_text(size = 18),
+                legend.position = "bottom",
+                title = element_text(size = 24),
+                plot.title = element_text(hjust = .5, vjust = 1),
+                legend.text = element_text(size = 12)
+            )
+    })
+
+    output$dkPlot <- renderPlot({
+        plot(dk) +
+            theme_void() +
+            theme(
+                strip.text = element_text(size = 18),
+                legend.position = "bottom",
+                title = element_blank(),
+                legend.text = element_text(size = 12)
+            )
+    })
+
+    session$onSessionEnded(function() {
+        dbDisconnect(con)
     })
 }
 
