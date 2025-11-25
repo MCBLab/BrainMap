@@ -85,7 +85,8 @@ ui <- navbarPage(
                 downloadButton("downloadTIFF", "Download TIFF")
             ),
             mainPanel(
-                plotOutput("brainPlot", height = "1200px")
+                plotOutput("brainPlot", height = "1200px"),
+                style = "padding-bottom: 70px;"
             )
         )
     ),
