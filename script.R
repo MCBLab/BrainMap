@@ -31,25 +31,45 @@ input_values <- c(NA, "bankssts", "caudal middle frontal", "fusiform", "inferior
                   "parahippocampal", "paracentral", "pericalcarine", "posterior cingulate", 
                   "precuneus", "rostral anterior cingulate", "frontal pole")
 
-# Vetor de saída (mapeamento hipotético; ajuste conforme necessário)
-output_values <- c(NA,"occipital neocortex", "dorsolateral prefrontal cortex", 
-                   "inferolateral temporal cortex (area TEv, area 20)", 
-                   "posteroventral (inferior) parietal cortex", "temporal neocortex", 
-                   "primary visual cortex (striate cortex, area V1/17)", "orbital frontal cortex", 
-                   "posterior (caudal) superior temporal cortex (area 22c)", 
-                   "ventrolateral prefrontal cortex", "orbital frontal cortex", 
-                   "ventrolateral prefrontal cortex", "primary somatosensory cortex (area S1, areas 3,1,2)", 
-                   "primary motor cortex (area M1, area 4)", "dorsolateral prefrontal cortex", 
-                   "anterior (rostral) cingulate (medial prefrontal) cortex", "parietal neocortex", 
-                   "temporal neocortex", "posteroventral (inferior) parietal cortex", 
-                   "amygdaloid complex", "primary auditory cortex (core)", "striatum", 
-                   "anterior (rostral) cingulate (medial prefrontal) cortex", "cerebellum", 
-                   "primary visual cortex (striate cortex, area V1/17)", "hippocampus (hippocampal formation)", 
-                   "mediodorsal nucleus of thalamus", "primary visual cortex (striate cortex, area V1/17)", 
-                   "orbital frontal cortex", "hippocampus (hippocampal formation)", 
-                   "primary motor-sensory cortex (samples)", "primary visual cortex (striate cortex, area V1/17)", 
-                   "mediodorsal nucleus of thalamus", "parietal neocortex", 
-                   "anterior (rostral) cingulate (medial prefrontal) cortex", "frontal pole")
+# Vetor de saída corrigido (BrainSpan regions)
+output_values <- c(
+  NA,
+  "posterior (caudal) superior temporal cortex (area 22c)",  # bankssts - parte do sulco temporal superior
+  "dorsolateral prefrontal cortex",  # caudal middle frontal
+  "inferolateral temporal cortex (area TEv, area 20)",  # fusiform
+  "posteroventral (inferior) parietal cortex",  # inferior parietal
+  "inferolateral temporal cortex (area TEv, area 20)",  # inferior temporal
+  "occipital neocortex",  # lateral occipital - V2/V3, não V1
+  "orbital frontal cortex",  # lateral orbitofrontal
+  "inferolateral temporal cortex (area TEv, area 20)",  # middle temporal
+  "ventrolateral prefrontal cortex",  # pars opercularis
+  "ventrolateral prefrontal cortex",  # pars orbitalis - mais VLPFC que OFC
+  "ventrolateral prefrontal cortex",  # pars triangularis
+  "primary somatosensory cortex (area S1, areas 3,1,2)",  # postcentral
+  "primary motor cortex (area M1, area 4)",  # precentral
+  "dorsolateral prefrontal cortex",  # rostral middle frontal
+  "dorsolateral prefrontal cortex",  # superior frontal
+  "posteroventral (inferior) parietal cortex",  # superior parietal
+  "posterior (caudal) superior temporal cortex (area 22c)",  # superior temporal
+  "posteroventral (inferior) parietal cortex",  # supramarginal
+  "inferolateral temporal cortex (area TEv, area 20)",  # temporal pole
+  "primary auditory cortex (core)",  # transverse temporal
+  "ventrolateral prefrontal cortex",  # insula - insula é única, uso VLPFC como próximo
+  "anterior (rostral) cingulate (medial prefrontal) cortex",  # caudal anterior cingulate
+  "orbital frontal cortex",  # corpus callosum - melhor usar uma região cortical genérica
+  "primary visual cortex (striate cortex, area V1/17)",  # cuneus
+  "inferolateral temporal cortex (area TEv, area 20)",  # entorhinal - próximo ao temporal
+  "posterior (caudal) superior temporal cortex (area 22c)",  # isthmus cingulate
+  "primary visual cortex (striate cortex, area V1/17)",  # lingual
+  "orbital frontal cortex",  # medial orbitofrontal
+  "inferolateral temporal cortex (area TEv, area 20)",  # parahippocampal - próximo
+  "primary motor cortex (area M1, area 4)",  # paracentral - motor/sensory
+  "primary visual cortex (striate cortex, area V1/17)",  # pericalcarine
+  "posterior (caudal) superior temporal cortex (area 22c)",  # posterior cingulate
+  "posteroventral (inferior) parietal cortex",  # precuneus - parietal medial
+  "anterior (rostral) cingulate (medial prefrontal) cortex",  # rostral anterior cingulate
+  "dorsolateral prefrontal cortex"  # frontal pole
+)
 
 # Criando um dataframe para visualizar o mapeamento
 mapping_df <- data.frame(region = input_values, structure_name = output_values, stringsAsFactors = FALSE)
