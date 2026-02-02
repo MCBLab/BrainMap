@@ -7,43 +7,20 @@
 #    https://shiny.posit.co/
 #
 library(shiny)
-library(readr)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(ggseg)
 library(GSVA)
-library(GSEABase)
-library(GSVAdata)
-library(msigdbr)
-library(scuttle)
-library(tibble)
 library(shinythemes)
 library(svglite)
-library(vroom)
-# library(RSQLite)
+library(shinycssloaders)
 
-# # Connect to the SQLite database
-# con <- dbConnect(RSQLite::SQLite(), "brain_data.sqlite")
-#
-# # Get gene list from the database
-# gene_list <- dbGetQuery(con, "SELECT DISTINCT gene_symbol FROM rows_metadata")$gene_symbol
-# Get gene list from the CSV file
+dados <- readRDS("dados_otimizados.rds")
 
-setwd("~/Documentos/BrainSpan/")
-rows <- vroom::vroom("genes_matrix_csv/rows_metadata.csv")
-columns <- vroom::vroom("genes_matrix_csv/columns_metadata.csv")
-gene_list <- unique(rows$gene_symbol)
-
-# Read and assemble the expression data
-counts <- vroom::vroom(
-  "genes_matrix_csv/expression_matrix.csv",
-  col_names = FALSE
-) %>%
-  dplyr::select(-1)
-colnames(counts) <- columns$column_num
-counts <- cbind(rows, counts)
-
+X <- dados$expression_matrix
+columns <- dados$col_meta
+gene_list <- dados$gene_list
 
 # Mapping dataframes
 input_values <- c(
@@ -178,17 +155,6 @@ age_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-#GSVA matrix
-filtragem <- counts %>%
-  distinct(gene_symbol, .keep_all = TRUE) %>%
-  filter(!is.na(gene_symbol) & gene_symbol != "") %>%
-  column_to_rownames(var = "gene_symbol")
-
-X <- filtragem %>%
-  dplyr::select(-row_num, -gene_id, -ensembl_gene_id, -entrez_id) %>%
-  as.matrix()
-
-X <- log2(X + 1)
 
 # UI
 ui <- navbarPage(
@@ -281,7 +247,8 @@ ui <- navbarPage(
         hr(),
       ),
       mainPanel(
-        plotOutput("gsvaPlot", height = "1200px")
+        withSpinner(plotOutput("gsvaPlot", height = "1200px"), type = 6),
+        style = "padding-bottom: 70px;"
       )
     )
   )
@@ -305,37 +272,28 @@ server <- function(input, output, session) {
     req(input$gene)
     gene <- input$gene
 
-    # The `counts` data frame now holds all the data
-    gene_data <- counts[counts$gene_symbol == gene, ]
-
-    if (nrow(gene_data) == 0) {
+    if (!gene %in% rownames(X)) {
       return(
         ggplot() +
           annotate(
             "text",
             x = 0.5,
             y = 0.5,
-            label = "Data not available for this gene",
+            label = "Data not available",
             size = 8
           ) +
           theme_void()
       )
     }
 
-    # Reshape the data to a long format
-    # The columns to pivot are the ones that are not in rows_metadata
-    row_metadata_cols <- colnames(rows)
-    gene_data_long <- gene_data %>%
-      pivot_longer(
-        cols = -all_of(row_metadata_cols),
-        names_to = "column_num",
-        values_to = "expression_value"
-      ) %>%
-      mutate(column_num = as.integer(column_num)) %>%
-      dplyr::select(column_num, expression_value)
+    expression_values <- X[gene, ]
 
-    # Join with metadata
-    plot_data <- gene_data_long %>%
+    # Criar dataframe leve apenas para plotagem
+    plot_data <- data.frame(
+      column_num = colnames(X),
+      expression_value = as.numeric(expression_values)
+    ) %>%
+      mutate(column_num = as.integer(column_num)) %>%
       left_join(columns, by = "column_num") %>%
       left_join(mapping_df, by = "structure_name") %>%
       left_join(age_df, by = "age")
@@ -420,17 +378,16 @@ server <- function(input, output, session) {
     req(input$gene_input_list)
 
     # Filtragem do texto de entrada, deixando o vetor de genes limpo
-    user_genes <- unlist(strsplit(input$gene_input_list, "\n"))
-    user_genes <- trimws(user_genes) # Remove espaços extras
-    user_genes <- user_genes[user_genes != ""] # Remove linhas vazias
-    user_genes <- unique(user_genes)
+    user_genes <- unique(trimws(unlist(strsplit(input$gene_input_list, "\n")))) #trimws -> remove espaços extras
+    user_genes <- user_genes[user_genes != ""] #remove linhas vazias
 
     # Validar se os genes existem na matriz X
     genes_validos <- intersect(user_genes, rownames(X))
+    genes_ausentes <- setdiff(user_genes, rownames(X))
 
-    if (length(genes_validos) < 3) {
+    if (length(genes_validos) < 5) {
       showNotification(
-        "Atenção: Menos de 3 genes da lista foram encontrados nos dados. O GSVA pode falhar ou ser impreciso.",
+        "Atenção: Menos de 5 genes da lista foram encontrados nos dados. O GSVA pode falhar ou ser impreciso.",
         type = "warning"
       )
     }
@@ -447,15 +404,31 @@ server <- function(input, output, session) {
 
     gsva_score_matrix <- gsva(params_custom)
 
-    return(gsva_score_matrix)
+    return(list(scores = gsva_score_matrix, missing = genes_ausentes))
   })
 
   # Renderizando o Plot do GSVA
   output$gsvaPlot <- renderPlot({
     req(gsva_result_reactive())
 
-    # Pegar a matriz de scores
-    score_matrix <- gsva_result_reactive()
+    # Peganado a matriz de scores
+    resultados <- gsva_result_reactive()
+    score_matrix <- resultados$scores
+    genes_ausentes <- resultados$missing
+
+    #Condicional para a ausencia dos genes
+    if (length(genes_ausentes) == 0) {
+      texto_legenda <- "Todos os genes apresentados estão listados"
+    } else {
+      lista_genes <- paste(genes_ausentes, collapse = ", ")
+      if (nchar(lista_genes) > 80) {
+        lista_genes <- paste0(substr(lista_genes, 1, 80), "...")
+      }
+      texto_legenda <- paste(
+        "Genes não listados na base de dados:",
+        lista_genes
+      )
+    }
 
     plot_data_gsva <- data.frame(
       column_num = colnames(score_matrix),
@@ -483,14 +456,7 @@ server <- function(input, output, session) {
       ) +
       labs(
         title = "Enriquecimento da Assinatura Personalizada nas Áreas Cerebrais",
-        subtitle = paste(
-          "Baseado em",
-          length(intersect(
-            rownames(X),
-            unique(trimws(unlist(strsplit(input$gene_input_list, "\n"))))
-          )),
-          "genes encontrados"
-        )
+        subtitle = texto_legenda
       ) +
       facet_wrap(
         ~ factor(broad_age, unique(age_df$broad_age)),
