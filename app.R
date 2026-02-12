@@ -194,7 +194,7 @@ ui <- navbarPage(
         downloadButton("downloadTIFF", "Download TIFF")
       ),
       mainPanel(
-        plotOutput("brainPlot", height = "1200px"),
+        withSpinner(plotOutput("brainPlot", height = "550px"), type = 6),
         style = "padding-bottom: 70px;"
       )
     )
@@ -237,7 +237,7 @@ ui <- navbarPage(
           "gene_input_list",
           "Lista de Genes:",
           height = "150px",
-          placeholder = "TP53\nEGFR\nVEGFA"
+          placeholder = "PAX6\nEGFR\nVEGFA"
         ),
         actionButton(
           "run_enrichment",
@@ -247,7 +247,7 @@ ui <- navbarPage(
         hr(),
       ),
       mainPanel(
-        withSpinner(plotOutput("gsvaPlot", height = "1200px"), type = 6),
+        withSpinner(plotOutput("gsvaPlot", height = "550px"), type = 6),
         style = "padding-bottom: 70px;"
       )
     )
@@ -255,18 +255,41 @@ ui <- navbarPage(
 )
 
 # Footer
-footer = tags$footer(
-  style = "position: fixed; bottom: 0; width: 100%; height: 50px; background-color: #f5f5f5; text-align: center; padding: 15px;",
-  a(
-    href = "https://mcblab.github.io/",
-    target = "_blank",
-    "Made by MCB Lab at UFRN"
+ui <- tagList(
+  ui,
+  tags$footer(
+    style = "position: fixed; bottom: 0; width: 100%; height: 50px; background-color: #f5f5f5; text-align: center; padding: 15px;",
+    a(
+      href = "https://mcblab.github.io/",
+      target = "_blank",
+      "Made by MCB Lab at UFRN"
+    )
   )
 )
 
 # Server
 server <- function(input, output, session) {
-  updateSelectizeInput(session, "gene", choices = gene_list, server = TRUE)
+  observe({
+    # Verificar se gene_list existe e tem conteúdo
+    if (exists("gene_list") && length(gene_list) > 0) {
+      updateSelectizeInput(
+        session,
+        "gene",
+        choices = sort(gene_list),
+        selected = "GFAP",
+        server = TRUE
+      )
+    } else {
+      # Se não tiver gene_list, criar uma lista básica
+      basic_genes <- c("GFAP", "ACTB", "GAPDH", "SOX2", "NESTIN", "MAP2")
+      updateSelectizeInput(
+        session,
+        "gene",
+        choices = basic_genes,
+        selected = "GFAP"
+      )
+    }
+  })
 
   brainPlotObject <- reactive({
     req(input$gene)
@@ -315,20 +338,34 @@ server <- function(input, output, session) {
       ) +
       facet_wrap(
         ~ factor(broad_age, unique(age_df$broad_age)),
-        nrow = 5
+        nrow = 1,
+        ncol = 5
       ) +
       theme_void() +
       theme(
-        strip.text = element_text(size = 18),
+        strip.text = element_text(
+          size = 14,
+          face = "bold",
+          angle = 0,
+          hjust = 0.5,
+          margin = margin(b = 5, t = 2)
+        ),
+        strip.placement = "outside",
+        strip.background = element_blank(),
         legend.position = "bottom",
         plot.background = element_rect(fill = "white", colour = NA),
-        legend.text = element_text(size = 12)
+        legend.text = element_text(size = 12),
+        panel.spacing = unit(0.3, "lines")
       )
   })
 
-  output$brainPlot <- renderPlot({
-    brainPlotObject()
-  })
+  output$brainPlot <- renderPlot(
+    {
+      brainPlotObject()
+    },
+    height = 450,
+    width = 820
+  )
 
   output$downloadSVG <- downloadHandler(
     filename = function() {
@@ -339,8 +376,8 @@ server <- function(input, output, session) {
         file,
         plot = brainPlotObject(),
         device = "svg",
-        width = 10,
-        height = 12
+        width = 18,
+        height = 5
       )
     }
   )
@@ -354,9 +391,10 @@ server <- function(input, output, session) {
         file,
         plot = brainPlotObject(),
         device = "tiff",
-        width = 10,
-        height = 12,
-        dpi = 300
+        width = 18,
+        height = 5,
+        dpi = 300,
+        compression = "lzw"
       )
     }
   )
@@ -365,10 +403,10 @@ server <- function(input, output, session) {
     plot(dk) +
       theme_void() +
       theme(
-        strip.text = element_text(size = 18),
+        strip.text = element_text(size = 12, face = "bold"),
         legend.position = "bottom",
         title = element_blank(),
-        legend.text = element_text(size = 12)
+        legend.text = element_text(size = 10)
       )
   })
 
@@ -408,72 +446,99 @@ server <- function(input, output, session) {
   })
 
   # Renderizando o Plot do GSVA
-  output$gsvaPlot <- renderPlot({
-    req(gsva_result_reactive())
+  output$gsvaPlot <- renderPlot(
+    {
+      req(gsva_result_reactive())
 
-    # Peganado a matriz de scores
-    resultados <- gsva_result_reactive()
-    score_matrix <- resultados$scores
-    genes_ausentes <- resultados$missing
+      # Peganado a matriz de scores
+      resultados <- gsva_result_reactive()
+      score_matrix <- resultados$scores
+      genes_ausentes <- resultados$missing
 
-    #Condicional para a ausencia dos genes
-    if (length(genes_ausentes) == 0) {
-      texto_legenda <- "Todos os genes apresentados estão listados"
-    } else {
-      lista_genes <- paste(genes_ausentes, collapse = ", ")
-      if (nchar(lista_genes) > 80) {
-        lista_genes <- paste0(substr(lista_genes, 1, 80), "...")
+      #Condicional para a ausencia dos genes
+      if (length(genes_ausentes) == 0) {
+        texto_legenda <- "Todos os genes apresentados estão listados"
+      } else {
+        lista_genes <- paste(genes_ausentes, collapse = ", ")
+        if (nchar(lista_genes) > 80) {
+          lista_genes <- paste0(substr(lista_genes, 1, 80), "...")
+        }
+        texto_legenda <- paste(
+          "Genes não listados na base de dados:",
+          lista_genes
+        )
       }
-      texto_legenda <- paste(
-        "Genes não listados na base de dados:",
-        lista_genes
-      )
-    }
 
-    plot_data_gsva <- data.frame(
-      column_num = colnames(score_matrix),
-      gsva_score = as.numeric(score_matrix[1, ])
-    ) %>%
-      mutate(column_num = as.integer(column_num)) %>%
-      left_join(columns, by = "column_num") %>%
-      left_join(mapping_df, by = "structure_name") %>%
-      left_join(age_df, by = "age")
+      plot_data_gsva <- data.frame(
+        column_num = colnames(score_matrix),
+        gsva_score = as.numeric(score_matrix[1, ])
+      ) %>%
+        mutate(column_num = as.integer(column_num)) %>%
+        left_join(columns, by = "column_num") %>%
+        left_join(mapping_df, by = "structure_name") %>%
+        left_join(age_df, by = "age")
 
-    plot_data_gsva %>%
-      group_by(broad_age) %>%
-      ggseg(
-        .data = .,
-        hemisphere = "left",
-        colour = "black",
-        mapping = aes(fill = gsva_score)
-      ) +
-      scale_fill_gradient2(
-        low = "royalblue",
-        mid = "firebrick",
-        high = "goldenrod",
-        midpoint = 0,
-        name = "GSVA Score"
-      ) +
-      labs(
-        title = "Enriquecimento da Assinatura Personalizada nas Áreas Cerebrais",
-        subtitle = texto_legenda
-      ) +
-      facet_wrap(
-        ~ factor(broad_age, unique(age_df$broad_age)),
-        nrow = 5
-      ) +
-      theme_void() +
-      theme(
-        strip.text = element_text(size = 18),
-        legend.position = "bottom",
-        plot.background = element_rect(fill = "white", colour = NA),
-        legend.text = element_text(size = 12)
-      )
-  })
-
-  # session$onSessionEnded(function() {
-  #     dbDisconnect(con)
-  # })
+      plot_data_gsva %>%
+        group_by(broad_age) %>%
+        ggseg(
+          .data = .,
+          hemisphere = "left",
+          colour = "black",
+          mapping = aes(fill = gsva_score)
+        ) +
+        scale_fill_gradient2(
+          low = "royalblue",
+          mid = "firebrick",
+          high = "goldenrod",
+          midpoint = 0,
+          name = "GSVA Score"
+        ) +
+        labs(
+          title = "Enriquecimento da Assinatura Personalizada nas Áreas Cerebrais",
+          subtitle = texto_legenda
+        ) +
+        facet_wrap(
+          ~ factor(broad_age, unique(age_df$broad_age)),
+          nrow = 1,
+          ncol = 5
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(
+            size = 16,
+            face = "bold",
+            hjust = 0.5,
+            vjust = 1,
+            margin = margin(t = 15, b = 10),
+            color = "black"
+          ),
+          plot.subtitle = element_text(
+            size = 14,
+            hjust = 0.5,
+            vjust = 1,
+            margin = margin(b = 20),
+            color = "gray40",
+            face = "italic"
+          ),
+          strip.text = element_text(
+            size = 14,
+            face = "bold",
+            angle = 0,
+            hjust = 0.5,
+            margin = margin(b = 5, t = 2)
+          ),
+          strip.placement = "outside",
+          strip.background = element_blank(),
+          legend.position = "bottom",
+          plot.background = element_rect(fill = "white", colour = NA),
+          legend.text = element_text(size = 12),
+          panel.spacing = unit(0.3, "lines")
+        )
+    },
+    height = 450,
+    width = 820
+  )
 }
+
 # Run the application
 shinyApp(ui = ui, server = server)
