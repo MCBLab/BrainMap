@@ -1,19 +1,8 @@
-#==============================================
-#BrainSpan: Atlas of the Developing Human Brain
-#==============================================
-
-#This data set contains RNA-Seq RPKM (reads per kilobase per million; see the whitepaper at
-#                                       www.brainspan.org) values averaged to genes.
-
-#expression_matrix.csv -- the rows are genes and the columns samples; the first column is the row number
-#rows_metadata.csv -- the genes are listed in the same order as the rows in expression_matrix.csv
-#columns_metadata.csv -- the samples are listed in the same order as the columns in expression_matrix
-
 library(vroom)
 library(dplyr)
 library(tibble)
 
-setwd("~/AppShiny/") # Ajuste para o seu caminho
+setwd("~/BrainMap/")
 
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
@@ -29,19 +18,14 @@ matriz_expressao <- as.matrix(counts_raw)
 colnames(matriz_expressao) <- columns$column_num
 rownames(matriz_expressao) <- rows$gene_symbol
 
-# 3. Pré-calcular Log2 (Para não fazer isso a cada clique)
-# Lidando com duplicatas de genes ou apenas removendo duplicatas para garantir rownames únicos
 genes_unicos <- !duplicated(rownames(matriz_expressao))
 matriz_expressao <- matriz_expressao[genes_unicos, ]
 matriz_final <- log2(matriz_expressao + 1)
 
-#media dos genes normalizados, caso < 1, é retirado do dataset
-media_genes <- rowMeans(matriz_final, na.rm = T)
-matriz_final <- matriz_final[media_genes > 1, ]
-
 dados_app <- list(
   expression_matrix = matriz_final,
-  col_meta = columns
+  col_meta = columns,
+  gene_list = rownames(matriz_final)
 )
 
 View(dados_app$expression_matrix)

@@ -54,8 +54,9 @@ RUN mkdir -p /srv/shiny-server/app
 
 # Copie o arquivo do aplicativo
 COPY app.R /srv/shiny-server/app/
+
 # Copie o arquivo de dados
-# COPY dados_otimizados.rds /srv/shiny-server/app/
+COPY dados_otimizados.rds /srv/shiny-server/app/
 
 # Configure permissões
 RUN chown -R shiny:shiny /srv/shiny-server/app
