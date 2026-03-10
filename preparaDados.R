@@ -2,7 +2,7 @@ library(vroom)
 library(dplyr)
 library(tibble)
 
-setwd("~/BrainMap/")
+setwd("~/AppShiny/")
 
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
@@ -14,24 +14,12 @@ counts_raw <- vroom(
   dplyr::select(-1)
 
 matriz_expressao <- as.matrix(counts_raw)
-
 colnames(matriz_expressao) <- columns$column_num
 rownames(matriz_expressao) <- rows$gene_symbol
 
 genes_unicos <- !duplicated(rownames(matriz_expressao))
 matriz_expressao <- matriz_expressao[genes_unicos, ]
 matriz_final <- log2(matriz_expressao + 1)
-
-dados_app <- list(
-  expression_matrix = matriz_final,
-  col_meta = columns,
-  gene_list = rownames(matriz_final)
-)
-
-View(dados_app$expression_matrix)
-
-saveRDS(dados_app, "dados_otimizados.rds")
-
 
 # Mapping dataframes
 input_values <- c(
@@ -75,41 +63,41 @@ input_values <- c(
 
 output_values <- c(
   NA,
-  "occipital neocortex",
-  "dorsolateral prefrontal cortex",
-  "inferolateral temporal cortex (area TEv, area 20)",
-  "posteroventral (inferior) parietal cortex",
-  "temporal neocortex",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "posterior (caudal) superior temporal cortex (area 22c)",
-  "ventrolateral prefrontal cortex",
-  "orbital frontal cortex",
-  "ventrolateral prefrontal cortex",
-  "primary somatosensory cortex (area S1, areas 3,1,2)",
-  "primary motor cortex (area M1, area 4)",
-  "dorsolateral prefrontal cortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "parietal neocortex",
-  "temporal neocortex",
-  "posteroventral (inferior) parietal cortex",
-  "amygdaloid complex",
-  "primary auditory cortex (core)",
-  "striatum",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "cerebellum",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "hippocampus (hippocampal formation)",
-  "mediodorsal nucleus of thalamus",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "hippocampus (hippocampal formation)",
-  "primary motor-sensory cortex (samples)",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "mediodorsal nucleus of thalamus",
-  "parietal neocortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "frontal pole"
+  "postcentral gyrus",
+  "middle frontal gyrus",
+  "fusiform gyrus",
+  "occiptal gyrus",
+  "inferior temporal gyrus",
+  "occiptal gyrus",
+  "olfactory tract",
+  "middle temporal gyrus",
+  "inferior frontal gyrus",
+  "medial orbital gyrus",
+  "fronto-orbital gyrus",
+  "postcentral gyrus",
+  "precentral gyrus",
+  "middle frontal gyrus",
+  "superior frontal gyrus",
+  "superior pariental lobule",
+  "superior temporal gyrus",
+  "supramarginal gurys",
+  "middle temporal gyrus",
+  "superior temporal gyrus",
+  "precentral gyrus",
+  "precentral gyrus",
+  "external capsule",
+  "occiptal gyrus",
+  "inferior temporal gyrus",
+  "occipital horm of the lateral ventricle",
+  "inferior occiptal gyrus",
+  "middle temporal gyrus",
+  "internal capsule",
+  "poscentral gyrus",
+  "occiptal gyrus",
+  "clastrum",
+  "angular gyrus",
+  "extreme capsule",
+  "fronto-orbital gyrus"
 )
 
 mapping_df <- data.frame(
@@ -118,6 +106,7 @@ mapping_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# Mapeamento de idades
 ages <- c(
   "8 pcw",
   "9 pcw",
@@ -166,34 +155,45 @@ age_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# Renomear a coluna structure_name para evitar conflito
+columns_renomeado <- columns %>%
+  rename(structure_original = structure_name)
 
-#verificação
+columns_enriquecidas <- columns_renomeado %>%
+  left_join(mapping_df, by = c("structure_original" = "region")) %>%
+  left_join(age_df, by = "age") %>%
+  mutate(
+    structure_mapped = ifelse(
+      is.na(structure_name),
+      structure_original,
+      structure_name
+    )
+  ) %>%
+  select(
+    column_num,
+    donor_id,
+    donor_name,
+    age,
+    broad_age,
+    structure_original,
+    structure_mapped
+  )
 
-cat("=== Comparação de estruturas Mapping vs Col_meta ===\n")
+# Criar uma versão simplificada apenas com o necessário para joins rápidos
+mapeamento_rapido <- columns_enriquecidas %>%
+  select(column_num, broad_age, structure_mapped)
 
-estruturas_no_dataset <- unique(dados_app$col_meta$structure_name)
-estruturas_no_mapping <- na.omit(mapping_df$structure_name)
+# Salvar os dados otimizados com todas as informações de mapeamento
+dados_app <- list(
+  expression_matrix = matriz_final,
+  col_meta = columns_enriquecidas, # Agora com os mapeamentos incluídos
+  gene_list = rownames(matriz_final),
+  mapping_info = list(
+    region_to_structure = mapping_df,
+    age_groups = age_df,
+    quick_lookup = mapeamento_rapido
+  )
+)
 
-existem_no_dataset <- estruturas_no_mapping %in% estruturas_no_dataset
-
-if (!all(existem_no_dataset)) {
-  cat("\n❌ Estruturas FALTANTES no dataset:\n")
-  faltantes <- estruturas_no_mapping[!existem_no_dataset]
-  print(faltantes)
-} else {
-  cat("✅ TODAS as estruturas do mapping existem no dataset!\n")
-}
-
-# 2. Verificar se há estruturas no dataset que NÃO estão no mapping
-cat("\n=== ESTRUTURAS EXTRAS NO DATASET ===\n")
-extras_no_dataset <- setdiff(estruturas_no_dataset, estruturas_no_mapping)
-cat(sprintf("Estruturas no dataset: %d\n", length(estruturas_no_dataset)))
-cat(sprintf(
-  "Estruturas que NÃO estão no mapping: %d\n",
-  length(extras_no_dataset)
-))
-
-if (length(extras_no_dataset) > 0) {
-  cat("Exemplos de estruturas extras:\n")
-  print(head(extras_no_dataset, 10))
-}
+# Salvar o arquivo RDS
+saveRDS(dados_app, "dados_otimizados.rds")
