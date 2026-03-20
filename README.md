@@ -5,7 +5,7 @@ A Shiny web application for visualizing gene expression throughout the developme
 ## 🚀 Features
 
 - **Gene Expression Mapping**: Search for any HGNC gene name to see its spatial expression pattern across 5 broad developmental stages (1st Trimester to Adult).
-- **GSVA-Enrichr Mode**: Upload a custom list of genes (gene signature) to calculate and visualize its activity across brain regions using Single Sample GSEA (ssGSEA).
+- **GSVA-Enrichr Mode**: Upload a custom list of genes (gene signature) to calculate and visualize its activity across brain regions using GSVA.
 - **High-Quality Exports**: Download brain maps in SVG or TIFF formats for publications.
 - **Interactive UI**: Built with a modern, responsive interface using `shinythemes` (Cerulean).
 
