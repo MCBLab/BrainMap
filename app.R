@@ -70,32 +70,6 @@ ui <- navbarPage(
   ),
 
   tabPanel(
-    "About",
-    fluidPage(
-      fluidRow(
-        column(
-          12,
-          h3("About This App"),
-          p(
-            "This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."
-          ),
-          p(
-            "The data is sourced from the",
-            a(
-              "BrainSpan Atlas of the Developing Human Brain",
-              target = "_blank",
-              href = "https://www.brainspan.org/"
-            ),
-            "."
-          ),
-          h4("Brain Regions Reference"),
-          plotOutput("dkPlot", height = "500px")
-        )
-      )
-    )
-  ),
-
-  tabPanel(
     "GSVA-Enrichr Mode",
     sidebarLayout(
       sidebarPanel(
@@ -118,6 +92,32 @@ ui <- navbarPage(
       mainPanel(
         withSpinner(plotOutput("gsvaPlot", height = "550px"), type = 6),
         style = "padding-bottom: 70px;"
+      )
+    )
+  ),
+
+  tabPanel(
+    "About",
+    fluidPage(
+      fluidRow(
+        column(
+          12,
+          h3("About This App"),
+          p(
+            "This application visualizes gene expression data from the Human Developmental Brain RNA-Seq dataset."
+          ),
+          p(
+            "The data is sourced from the",
+            a(
+              "BrainSpan Atlas of the Developing Human Brain",
+              target = "_blank",
+              href = "https://www.brainspan.org/"
+            ),
+            "."
+          ),
+          h4("Brain Regions Reference"),
+          plotOutput("dkPlot", height = "500px")
+        )
       )
     )
   )
@@ -186,15 +186,17 @@ server <- function(input, output, session) {
       expression_value = as.numeric(expression_values)
     ) %>%
       mutate(column_num = as.integer(column_num)) %>%
-      left_join(columns, by = "column_num")
+      left_join(columns, by = "column_num") %>%
+      rename(region = structure_mapped)
 
     plot_data %>%
+      filter(!is.na(region)) %>%
       group_by(broad_age) %>%
       ggseg(
         .data = .,
         hemisphere = "left",
         colour = "black",
-        mapping = aes(fill = log2(expression_value + 1))
+        mapping = aes(fill = log2(expression_value))
       ) +
       scale_fill_gradientn(
         colours = c("royalblue", "firebrick", "goldenrod"),
@@ -290,6 +292,14 @@ server <- function(input, output, session) {
     genes_validos <- intersect(user_genes, rownames(X))
     genes_ausentes <- setdiff(user_genes, rownames(X))
 
+    if (length(genes_validos) == 0) {
+        showNotification(
+            "Erro: Nenhum dos genes da lista foi encontrado nos dados.",
+            type = "error"
+        )
+        return(NULL)
+    }
+
     if (length(genes_validos) < 5) {
       showNotification(
         "Atenção: Menos de 5 genes da lista foram encontrados nos dados. O GSVA pode falhar ou ser impreciso.",
@@ -315,10 +325,10 @@ server <- function(input, output, session) {
   # Renderizando o Plot do GSVA
   output$gsvaPlot <- renderPlot(
     {
-      req(gsva_result_reactive())
-
       # Peganado a matriz de scores
       resultados <- gsva_result_reactive()
+      req(resultados) # Garantir que resultados não é NULL
+      
       score_matrix <- resultados$scores
       genes_ausentes <- resultados$missing
 
@@ -341,9 +351,11 @@ server <- function(input, output, session) {
         gsva_score = as.numeric(score_matrix[1, ])
       ) %>%
         mutate(column_num = as.integer(column_num)) %>%
-        left_join(columns, by = "column_num")
+        left_join(columns, by = "column_num") %>%
+        rename(region = structure_mapped)
 
       plot_data_gsva %>%
+        filter(!is.na(region)) %>%
         group_by(broad_age) %>%
         ggseg(
           .data = .,
