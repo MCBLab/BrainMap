@@ -2,8 +2,6 @@ library(vroom)
 library(dplyr)
 library(tibble)
 
-setwd("~/AppShiny/")
-
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
 
@@ -63,41 +61,41 @@ input_values <- c(
 
 output_values <- c(
   NA,
-  "postcentral gyrus",
-  "middle frontal gyrus",
-  "fusiform gyrus",
-  "occiptal gyrus",
-  "inferior temporal gyrus",
-  "occiptal gyrus",
-  "olfactory tract",
-  "middle temporal gyrus",
-  "inferior frontal gyrus",
-  "medial orbital gyrus",
-  "fronto-orbital gyrus",
-  "postcentral gyrus",
-  "precentral gyrus",
-  "middle frontal gyrus",
-  "superior frontal gyrus",
-  "superior pariental lobule",
-  "superior temporal gyrus",
-  "supramarginal gurys",
-  "middle temporal gyrus",
-  "superior temporal gyrus",
-  "precentral gyrus",
-  "precentral gyrus",
-  "external capsule",
-  "occiptal gyrus",
-  "inferior temporal gyrus",
-  "occipital horm of the lateral ventricle",
-  "inferior occiptal gyrus",
-  "middle temporal gyrus",
-  "internal capsule",
-  "poscentral gyrus",
-  "occiptal gyrus",
-  "clastrum",
-  "angular gyrus",
-  "extreme capsule",
-  "fronto-orbital gyrus"
+  "occipital neocortex",
+  "dorsolateral prefrontal cortex",
+  "inferolateral temporal cortex (area TEv, area 20)",
+  "posteroventral (inferior) parietal cortex",
+  "temporal neocortex",
+  "primary visual cortex (striate cortex, area V1/17)",
+  "orbital frontal cortex",
+  "posterior (caudal) superior temporal cortex (area 22c)",
+  "ventrolateral prefrontal cortex",
+  "orbital frontal cortex",
+  "ventrolateral prefrontal cortex",
+  "primary somatosensory cortex (area S1, areas 3,1,2)",
+  "primary motor cortex (area M1, area 4)",
+  "dorsolateral prefrontal cortex",
+  "anterior (rostral) cingulate (medial prefrontal) cortex",
+  "parietal neocortex",
+  "temporal neocortex",
+  "posteroventral (inferior) parietal cortex",
+  "amygdaloid complex",
+  "primary auditory cortex (core)",
+  "striatum",
+  "anterior (rostral) cingulate (medial prefrontal) cortex",
+  "cerebellum",
+  "primary visual cortex (striate cortex, area V1/17)",
+  "hippocampus (hippocampal formation)",
+  "mediodorsal nucleus of thalamus",
+  "primary visual cortex (striate cortex, area V1/17)",
+  "orbital frontal cortex",
+  "hippocampus (hippocampal formation)",
+  "primary motor-sensory cortex (samples)",
+  "primary visual cortex (striate cortex, area V1/17)",
+  "mediodorsal nucleus of thalamus",
+  "parietal neocortex",
+  "anterior (rostral) cingulate (medial prefrontal) cortex",
+  "frontal pole"
 )
 
 mapping_df <- data.frame(
@@ -160,14 +158,10 @@ columns_renomeado <- columns %>%
   rename(structure_original = structure_name)
 
 columns_enriquecidas <- columns_renomeado %>%
-  left_join(mapping_df, by = c("structure_original" = "region")) %>%
+  left_join(mapping_df, by = c("structure_original" = "structure_name")) %>%
   left_join(age_df, by = "age") %>%
   mutate(
-    structure_mapped = ifelse(
-      is.na(structure_name),
-      structure_original,
-      structure_name
-    )
+    structure_mapped = region
   ) %>%
   select(
     column_num,
