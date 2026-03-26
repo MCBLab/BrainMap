@@ -29,7 +29,7 @@ age_df <- dados$mapping_info$age_groups
 ui <- navbarPage(
   title = "Gene Expression in Human Developmental Brain",
   theme = shinytheme("cerulean"),
-
+  
   header = tags$head(
     tags$link(
       rel = "stylesheet",
@@ -45,7 +45,7 @@ ui <- navbarPage(
         "
     ))
   ),
-
+  
   tabPanel(
     "App",
     sidebarLayout(
@@ -68,7 +68,7 @@ ui <- navbarPage(
       )
     )
   ),
-
+  
   tabPanel(
     "GSVA-Enrichr Mode",
     sidebarLayout(
@@ -95,7 +95,7 @@ ui <- navbarPage(
       )
     )
   ),
-
+  
   tabPanel(
     "About",
     fluidPage(
@@ -159,11 +159,11 @@ server <- function(input, output, session) {
       )
     }
   })
-
+  
   brainPlotObject <- reactive({
     req(input$gene)
     gene <- input$gene
-
+    
     if (!gene %in% rownames(X)) {
       return(
         ggplot() +
@@ -177,9 +177,9 @@ server <- function(input, output, session) {
           theme_void()
       )
     }
-
+    
     expression_values <- X[gene, ]
-
+    
     # Criar dataframe leve apenas para plotagem
     plot_data <- data.frame(
       column_num = colnames(X),
@@ -188,7 +188,7 @@ server <- function(input, output, session) {
       mutate(column_num = as.integer(column_num)) %>%
       left_join(columns, by = "column_num") %>%
       rename(region = structure_mapped)
-
+    
     plot_data %>%
       filter(!is.na(region)) %>%
       group_by(broad_age) %>%
@@ -227,7 +227,7 @@ server <- function(input, output, session) {
         panel.spacing = unit(0.3, "lines")
       )
   })
-
+  
   output$brainPlot <- renderPlot(
     {
       brainPlotObject()
@@ -235,7 +235,7 @@ server <- function(input, output, session) {
     height = 450,
     width = 820
   )
-
+  
   output$downloadSVG <- downloadHandler(
     filename = function() {
       paste0("brain_plot-", input$gene, ".svg")
@@ -250,7 +250,7 @@ server <- function(input, output, session) {
       )
     }
   )
-
+  
   output$downloadTIFF <- downloadHandler(
     filename = function() {
       paste0("brain_plot-", input$gene, ".tiff")
@@ -267,7 +267,7 @@ server <- function(input, output, session) {
       )
     }
   )
-
+  
   output$dkPlot <- renderPlot({
     plot(dk) +
       theme_void() +
@@ -278,50 +278,50 @@ server <- function(input, output, session) {
         legend.text = element_text(size = 10)
       )
   })
-
+  
   #GVSA
   # Calculating GVSA
   gsva_result_reactive <- eventReactive(input$run_enrichment, {
     req(input$gene_input_list)
-
+    
     # Filtragem do texto de entrada, deixando o vetor de genes limpo
     user_genes <- unique(trimws(unlist(strsplit(input$gene_input_list, "\n")))) #trimws -> remove espaços extras
     user_genes <- user_genes[user_genes != ""] #remove linhas vazias
-
+    
     # Validar se os genes existem na matriz X
     genes_validos <- intersect(user_genes, rownames(X))
     genes_ausentes <- setdiff(user_genes, rownames(X))
-
+    
     if (length(genes_validos) == 0) {
-        showNotification(
-            "Erro: Nenhum dos genes da lista foi encontrado nos dados.",
-            type = "error"
-        )
-        return(NULL)
+      showNotification(
+        "Erro: Nenhum dos genes da lista foi encontrado nos dados.",
+        type = "error"
+      )
+      return(NULL)
     }
-
+    
     if (length(genes_validos) < 5) {
       showNotification(
         "Atenção: Menos de 5 genes da lista foram encontrados nos dados. O GSVA pode falhar ou ser impreciso.",
         type = "warning"
       )
     }
-
+    
     # Lista de Gene Sets
     custom_gene_set <- list("Custom_Signature" = genes_validos)
-
+    
     # Configurar parametros e rodar GSVA
     params_custom <- gsvaParam(
       exprData = X,
       geneSets = custom_gene_set,
       kcdf = "Gaussian"
     ) # Gaussian -> dados em log2
-
+    
     gsva_score_matrix <- gsva(params_custom)
-
+    
     return(list(scores = gsva_score_matrix, missing = genes_ausentes))
   })
-
+  
   # Renderizando o Plot do GSVA
   output$gsvaPlot <- renderPlot(
     {
@@ -331,7 +331,7 @@ server <- function(input, output, session) {
       
       score_matrix <- resultados$scores
       genes_ausentes <- resultados$missing
-
+      
       #Condicional para a ausencia dos genes
       if (length(genes_ausentes) == 0) {
         texto_legenda <- "Todos os genes apresentados estão listados"
@@ -345,7 +345,7 @@ server <- function(input, output, session) {
           lista_genes
         )
       }
-
+      
       plot_data_gsva <- data.frame(
         column_num = colnames(score_matrix),
         gsva_score = as.numeric(score_matrix[1, ])
@@ -353,7 +353,7 @@ server <- function(input, output, session) {
         mutate(column_num = as.integer(column_num)) %>%
         left_join(columns, by = "column_num") %>%
         rename(region = structure_mapped)
-
+      
       plot_data_gsva %>%
         filter(!is.na(region)) %>%
         group_by(broad_age) %>%

@@ -2,6 +2,7 @@ library(vroom)
 library(dplyr)
 library(tibble)
 
+
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
 
