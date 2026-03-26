@@ -1,0 +1,113 @@
+---
+title: "Comparar os modulos de coexpressão de modelo de desenvolvimento do cortex controle com modelo de knockout de ZBTB20, em transcriptonica."
+author: "Isaquinho"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    css: "mcblab-style.css"
+    self-contained: true
+    theme: cosmo
+    sidebar:
+      style: "floating"
+      collapse-level: 1
+      search: true
+editor: visual
+---
+
+##Script
+
+Coletar os dados de enriquecimento ja encontrados no site do GSEA - h, c2 / BioCarta subset of CP, c2 /KEGG_LEGACY/ Reactome - para a testagem da relação de expressão entre padrões já conhecidos, e relacionar qual algoritmo vai ter melhor demonstração dos dados observados, seja ssGSEA ou GSVA.
+
+##GSVA
+
+```{r library}
+#setwd("~/brainmap")
+
+library(GSVA)
+library(msigdbr)
+library(tidyverse)
+library(ggseg)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+```{r GSVA}
+dados_app <- readRDS("~/brainmap/dados_otimizados.rds")
+
+matrix_dados <- as.matrix(dados_app$expression_matrix)
+
+h_df <- msigdbr(species = "Homo sapiens", category = "H")
+biocarta_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:BIOCARTA")
+kegg_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG_LEGACY")
+reactome_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+
+all_genesets_df <- bind_rows(h_df, biocarta_df, kegg_df, reactome_df)
+
+genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
+
+print(paste("Total de conjuntos de genes carregados:", length(genesets_list)))
+
+gsva_param <- gsvaParam(exprData = matrix_dados, geneSets = genesets_list)
+gsva_results <- gsva(gsva_param)
+
+tabela_final <- as.data.frame(gsva_results) %>%
+  rownames_to_column(var = "GeneSet") %>%
+  pivot_longer(
+    cols = -GeneSet,          
+    names_to = "Amostra",
+    values_to = "Score"     
+  )
+
+write_csv(tabela_final, "~/brainmap/gsva_scores_all_genes_msigdb.csv")
+
+tabela_final <- read.csv("~/brainmap/gsva_scores_all_genes_msigdb.csv")
+```
+
+```{r ssGSEA}
+
+```
+
+```{r ggseg GSVA}
+dados_prontos <- tabela_final %>%
+  mutate(Amostra = as.numeric(Amostra)) %>%
+  left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+  rename(region = structure_mapped) %>%
+  filter(
+    GeneSet == "KEGG_ALZHEIMERS_DISEASE", 
+    !is.na(region),        
+    !is.na(broad_age)  
+  ) %>%
+  group_by(broad_age, region) %>%
+  summarise(Score_Medio = mean(Score, na.rm = TRUE), .groups = "drop")
+
+dados_prontos %>% 
+ggplot() +
+  geom_brain(
+    .data = .,
+    hemi = "left",
+    mapping = aes(fill = Score_Medio)
+  ) +
+  scale_fill_viridis_c(
+    option = "magma", 
+    name = "GSVA\nScore", 
+    na.value = "grey90"
+  ) +
+  facet_wrap(
+    ~ factor(broad_age, levels = unique(dados_prontos$broad_age)),
+    ncol = 2
+  ) +
+  theme_void() +
+  theme(
+    strip.text = element_text(size = 12, face = "bold", margin = margin(b = 5)),
+    legend.position = "bottom"
+  )
+
+```
+
+##ssGSEA
+
+```{r}
+
+```
