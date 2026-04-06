@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicação BrainMap</title>
+    <style>
+        /* Paleta de cores baseada na imagem */
+        :root {
+            --text-dark: #2c3e50;      /* Azul escuro/cinza para os títulos */
+            --text-muted: #7f8c8d;     /* Cinza para as descrições */
+            --blue-accent: #3498db;    /* Azul claro para linha e links */
+            --border-light: #ecf0f1;   /* Cinza bem claro para bordas */
+            --bg-color: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-dark);
+            background-color: var(--bg-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Container centralizado */
+        .container {
+            max-width: 850px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        /* Estilos do Cabeçalho */
+        header {
+            border-bottom: 3px solid var(--blue-accent);
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            color: var(--text-dark);
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .description {
+            font-size: 1.05rem;
+            color: #4a5568;
+            margin-bottom: 45px;
+        }
+
+        /* Seção de Análises */
+        h2 {
+            font-size: 1.5rem;
+            color: var(--text-dark);
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        /* Estilos dos Cards (Links) */
+        .card {
+            display: block; /* Torna o card inteiro clicável */
+            text-decoration: none;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 20px 25px;
+            margin-bottom: 15px;
+            background-color: var(--bg-color);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .card:hover {
+            border-color: #bdc3c7;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.04);
+            transform: translateY(-2px);
+        }
+
+        .card h3 {
+            color: var(--blue-accent);
+            margin: 0 0 8px 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        /* Estilos do Rodapé */
+        footer {
+            margin-top: 60px;
+            padding-top: 25px;
+            border-top: 1px solid var(--border-light);
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        footer a {
+            color: var(--blue-accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <header>
+            <h1>BrainMap - 2026</h1>
+        </header>
+        
+        <p class="description">Aplicação web para visualização da expressão gênica ao longo do desenvolvimento do cérebro humano.</p>
+
+        <section>
+            <h2>Analise</h2>
+
+            <a href="./seu_relatorio_principal.html" class="card">
+                <h3>💻 Rodando a Aplicação </h3>
+                <p>Testing ap</p>
+            </a>
+            
+            </section>
+
+        <footer>
+            <p>MCBLab &copy; 2025 | <a href="https://github.com/MCBLab" target="_blank">View on GitHub</a></p>
+        </footer>
+
+    </div>
+
+</body>
+</html>

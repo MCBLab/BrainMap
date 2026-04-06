@@ -138,27 +138,15 @@ ui <- tagList(
 
 # Server
 server <- function(input, output, session) {
-  observe({
-    # Verificar se gene_list existe e tem conteúdo
-    if (exists("gene_list") && length(gene_list) > 0) {
+
       updateSelectizeInput(
         session,
         "gene",
-        choices = sort(gene_list),
+        choices = gene_list,
         selected = "GFAP",
         server = TRUE
       )
-    } else {
-      # Se não tiver gene_list, criar uma lista básica
-      basic_genes <- c("GFAP", "ACTB", "GAPDH", "SOX2", "NESTIN", "MAP2")
-      updateSelectizeInput(
-        session,
-        "gene",
-        choices = basic_genes,
-        selected = "GFAP"
-      )
-    }
-  })
+
   
   brainPlotObject <- reactive({
     req(input$gene)
