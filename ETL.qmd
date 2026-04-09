@@ -17,9 +17,17 @@ editor: visual
 
 
 ![](https://mcblab.github.io/images/logos/lab_icon_long.png){width="200px"} This analysis was performed by [MCB Lab](https://mcblab.github.io/).
+<<<<<<< HEAD
 ```{r library}
 #| echo: false
 #| warning: false
+=======
+
+```{r library}
+#| echo: false
+#| warning: false
+#setwd("~/brainmap")
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 
 library(GSVA)
 library(msigdbr)
@@ -28,6 +36,7 @@ library(ggseg)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
+<<<<<<< HEAD
 library(vroom)
 library(tibble)
 ```
@@ -261,6 +270,116 @@ tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
   )
 
 write_csv(tabela_final_ssgsea, "~/ssgsea_scores_all_genes_msigdb_Ontology.csv")
+=======
+```
+
+```{r Gene Analisys}
+#| echo: false
+#| warning: false
+dados_app <- readRDS("/home/imdacosta/brainmap/dados_otimizados.rds")
+
+#matrix_dados <- as.matrix(dados_app$expression_matrix)
+#matrix_dados <- log2(matrix_dados + 1)
+
+#meu_gene <- "SOX10" 
+
+#valores_expressao <- matrix_dados[meu_gene, ]
+
+#dados_gene_plot <- data.frame(
+#  Amostra = as.numeric(colnames(matrix_dados)),
+#  Expressao = as.numeric(valores_expressao)) %>%
+#  left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+#  rename(region = structure_mapped) %>% 
+#  filter(!is.na(region), !is.na(broad_age)) %>%
+#  group_by(broad_age, region) %>%
+#  summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
+
+#dados_gene_plot %>% 
+#ggplot() +
+#  geom_brain(
+#    atlas = ggseg::dk(),
+#   position = position_brain(c(
+#      "right lateral", "right medial")),
+#    mapping = aes(fill = log2(Expressao_Media))
+#  ) +
+#    scale_fill_gradient2(
+#    low = "royalblue",
+#    mid = "firebrick",
+#    high = "goldenrod",
+#    midpoint = 0,
+#    name = "Score"
+#  ) +
+#  facet_wrap(
+#    ~ factor(broad_age, levels = unique(dados_gene_plot$broad_age)),
+#    ncol = 2
+#  ) +
+#  theme_void() +
+#    theme(
+#        strip.text = element_text(
+#          size = 14,
+#          face = "bold",
+#          angle = 0,
+#          hjust = 0.5,
+#          margin = margin(b = 5, t = 2)
+#        ),
+#        strip.background = element_blank(),
+#        legend.position = "bottom",
+#        plot.background = element_rect(fill = "white", colour = NA),
+#        legend.text = element_text(size = 12),
+#        panel.spacing = unit(0.3, "lines")
+#      )
+
+```
+
+```{r Scores}
+#| echo: false
+#| warning: false
+
+#h_df <- msigdbr(species = "Homo sapiens", category = "H")
+#biocarta_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:BIOCARTA")
+#kegg_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG_LEGACY")
+#reactome_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+#geneont_df <- msigdbr(species = "Homo sapiens", collection = "C5")
+
+#all_genesets_df <- bind_rows(geneont_df)
+
+#genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
+
+#print(paste("Total de conjuntos de genes carregados:", length(genesets_list)))
+
+#GSVA Score
+#gsva_param <- gsvaParam(exprData = matrix_dados, geneSets = genesets_list)
+#gsva_results <- gsva(gsva_param)
+
+#tabela_final_gsva <- as.data.frame(gsva_results) %>%
+#  rownames_to_column(var = "GeneSet") %>%
+#  pivot_longer(
+#    cols = -GeneSet,          
+#    names_to = "Amostra",
+#    values_to = "Score_GSVA"     
+#  )
+
+#ssGSEA Score
+#ssgsea_param <- ssgseaParam(exprData = matrix_dados, geneSets = genesets_list)
+#ssgsea_results <- gsva(ssgsea_param)
+
+#tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
+#  rownames_to_column(var = "GeneSet") %>%
+#  pivot_longer(
+#    cols = -GeneSet,          
+#    names_to = "Amostra",
+#    values_to = "Score_ssGSEA"
+#  )
+
+#write_csv(tabela_final_gsva, "/home/imdacosta/brainmap/gsva_scores_all_genes_msigdb.csv")
+#write_csv(tabela_final_ssgsea, "/home/imdacosta/brainmap/ssgsea_scores_all_genes_msigdb.csv")
+
+tabela_final_gsva <- read.csv("/home/imdacosta/brainmap/gsva_scores_all_genes_msigdb.csv")
+tabela_final_ssgsea <- read.csv("/home/imdacosta/brainmap/ssgsea_scores_all_genes_msigdb.csv")
+
+
+#grep("BRAIN", unique(tabela_final_gsva$GeneSet), ignore.case = TRUE, value = TRUE)
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 ```
 
 ## Introdução
@@ -271,6 +390,7 @@ A seguinte aplicação tem como objetivo a vizualização nas variações dos n�
 
 A vizualização obtida a seguir se baseia na utilização de dados provindos do MSigDB - https://www.gsea-msigdb.org/gsea/msigdb/human/collections.jsp#H - dando um suporte teórico afim de observar se os níveis de expressão batem com oque está sendo mostrado nos calculos de score compostos dos conjuntos de genes utilizados a seguir,
 
+<<<<<<< HEAD
 ### ssGSEA
 
 A via escolhida para vizualização teste, com base no método de variação da atividade de vias biológicas, foi o "GOBP_FOREBRAIN_GENERATION_OF_NEURONS". Está via documentada pelo Geno Ontology do MSingDB representa da geração de neuronios prosenséfalo.
@@ -283,20 +403,39 @@ dados_app <- readRDS("~/dados_otimizados_Allen.rds")
 tabela_final_ssgsea <- read.csv("~/ssgsea_scores_all_genes_msigdb_Ontology.csv")
 
 dados_prontos <- tabela_final_ssgsea %>%
+=======
+### GSVA Plot
+
+A via escolhida para vizualização teste, com base no método de variação da atividade de vias biológicas, foi o "GOBP_FOREBRAIN_GENERATION_OF_NEURONS". Está via documentada pelo Geno Ontology do MSingDB representa da geração de neuronios prosenséfalo.
+```{r ggseg GSVA}
+#| echo: false
+#| warning: false
+
+dados_prontos <- tabela_final_gsva %>%
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
   mutate(Amostra = as.numeric(Amostra)) %>%
   left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
   rename(region = structure_mapped) %>%
   filter(
     GeneSet == "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", 
     !is.na(region),        
+<<<<<<< HEAD
     !is.na(broad_age)  
   ) %>%
   group_by(broad_age, region) %>%
   summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+=======
+    !is.na(broad_age),
+    !is.na(Score_GSVA)
+  ) %>%
+  group_by(broad_age, region) %>%
+  summarise(Score_Medio_GSVA = mean(Score_GSVA, na.rm = TRUE), .groups = "drop")
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 
 dados_prontos %>% 
 ggplot() +
   geom_brain(
+<<<<<<< HEAD
     atlas = ggseg::dk(),
    position = position_brain(c(
       "right lateral", "right medial")),
@@ -305,6 +444,16 @@ ggplot() +
     scale_fill_viridis_c(
     option = "viridis",
     name = "ssGSEA Score"
+=======
+    atlas = ggseg::dk(), 
+   position = position_brain(c(
+      "right lateral", "right medial")),
+    mapping = aes(fill = Score_Medio_GSVA)
+  ) +
+    scale_fill_viridis_c(
+    option = "viridis", # Opções boas: "viridis", "magma", "inferno", "plasma"
+    name = "GSVA Score"
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
   ) +
   facet_wrap(
     ~ factor(broad_age, levels = unique(dados_prontos$broad_age)),
@@ -329,14 +478,82 @@ ggplot() +
   )
 ```
 
+<<<<<<< HEAD
+=======
+### ssGSEA
+
+Métodologia de calculo alternativa do GSVA, ambos os métodos fazem o calculo de score composto para os conjuntos de genes de entrada. O método será escolhido medianta a eficiência de execução.
+
+```{r ggseg ssGSEA}
+#| echo: false
+#| warning: false
+
+dados_prontos <- tabela_final_ssgsea %>%
+  mutate(Amostra = as.numeric(Amostra)) %>%
+  left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+  rename(region = structure_mapped) %>%
+  filter(
+    GeneSet == "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", 
+    !is.na(region),        
+    !is.na(broad_age)  
+  ) %>%
+  group_by(broad_age, region) %>%
+  summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+
+dados_prontos %>% 
+ggplot() +
+  geom_brain(
+    atlas = ggseg::dk(),
+   position = position_brain(c(
+      "right lateral", "right medial")),
+    mapping = aes(fill = Score_Medio_ssGSEA)
+  ) +
+    scale_fill_viridis_c(
+    option = "inferno", # Opções boas: "viridis", "magma", "inferno", "plasma"
+    name = "ssGSEA Score"
+  ) +
+  facet_wrap(
+    ~ factor(broad_age, levels = unique(dados_prontos$broad_age)),
+    ncol = 2
+  ) +
+  theme_void() +
+  theme(
+    theme(
+        strip.text = element_text(
+          size = 14,
+          face = "bold",
+          angle = 0,
+          hjust = 0.5,
+          margin = margin(b = 5, t = 2)
+        ),
+        strip.background = element_blank(),
+        legend.position = "bottom",
+        plot.background = element_rect(fill = "white", colour = NA),
+        legend.text = element_text(size = 12),
+        panel.spacing = unit(0.3, "lines")
+      )
+  )
+
+```
+
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 ## Allen 
 
 Retirado do www.brainspan.org, os dados de scRNA-seq utilizados para a seguinte vizualização foram retirados de tercido Humano em um intervalo temporal que cobriu quase toda a extensão da vida humana, com amostras variando desde as 5 semanas pós-concepcionais (PCW) até os 64 anos de idade pós-natal.
 
+<<<<<<< HEAD
 ```{r Genes Allen}
 #| echo: false
 #| warning: false
 
+=======
+```{r dado Allen}
+#| echo: false
+#| warning: false
+
+#dados_app <- readRDS("/home/imdacosta/brainmap/dados_otimizados.rds")
+
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 columns <- dados_app$col_meta
 gene_list <- c("MEF2C", "ZNF184", "TCF4", "FEZF2", "SOX5", "TBR1", 
                "SATB2", "NR4A2", "TSHZ3", "CTC-467M3.3", "LINC01415", 
@@ -354,6 +571,26 @@ genes_ausentes <- setdiff(gene_list, rownames(matrix_dados_allen))
     
     # Lista de Gene Sets
     custom_gene_set <- list("Custom_Signature" = genes_validos)
+<<<<<<< HEAD
+=======
+    
+    # Configurar parametros e rodar GSVA
+    params_custom <- gsvaParam(
+      exprData = matrix_dados_allen,
+      geneSets = custom_gene_set,
+      kcdf = "Gaussian"
+    ) # Gaussian -> dados em log2
+    
+    gsva_score_matrix <- gsva(params_custom)
+
+tabela_final_gsva_allen <- as.data.frame(gsva_score_matrix) %>%
+  rownames_to_column(var = "GeneSet") %>%
+  pivot_longer(
+    cols = -GeneSet,          
+    names_to = "Amostra",
+    values_to = "Score_GSVA"     
+  )
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 
 #ssGSEA Score
     params_custom_ssgsea <- ssgseaParam(
@@ -374,10 +611,70 @@ tabela_final_ssgsea_allen <- as.data.frame(gsva_score_matrix_ssgsea) %>%
 
 ```
 
+<<<<<<< HEAD
 ### ssGSEA
 
 Com base em Mingfeng et al., estamos observando um módulo obtido a partir do WGCNA, o ME37, onde foi observado que este módulo no decorrer do desenvolvimento apresenta sua maior taxa de mudança (flutuação de expressão) no neocórtex durante a transição do período fetal. Tentaremos observar como a ferramenta BrainMap poderá representar isso,
 
+=======
+### GSVA plot 
+
+Com base em Mingfeng et al., estamos observando um módulo obtido a partir do WGCNA, o ME37, onde foi observado que este módulo no decorrer do desenvolvimento apresenta sua maior taxa de mudança (flutuação de expressão) no neocórtex durante a transição do período fetal. Tentaremos observar como a ferramenta BrainMap poderá representar isso,
+
+```{r GSVA Allen}
+#| echo: false
+#| warning: false
+dados_prontos <- tabela_final_gsva_allen %>%
+  mutate(Amostra = as.numeric(Amostra)) %>%
+  left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+  rename(region = structure_mapped) %>%
+  filter(
+    GeneSet == "Custom_Signature", 
+    !is.na(region),        
+    !is.na(broad_age),
+    !is.na(Score_GSVA)
+  ) %>%
+  group_by(broad_age, region) %>%
+  summarise(Score_Medio_GSVA = mean(Score_GSVA, na.rm = TRUE), .groups = "drop")
+
+dados_prontos %>% 
+ggplot() +
+  geom_brain(
+    atlas = ggseg::dk(), 
+   position = position_brain(c(
+      "right lateral", "right medial")),
+    mapping = aes(fill = Score_Medio_GSVA)
+  ) +
+    scale_fill_viridis_c(
+    option = "viridis", # Opções boas: "viridis", "magma", "inferno", "plasma"
+    name = "GSVA Score"
+  ) +
+  facet_wrap(
+    ~ factor(broad_age, levels = unique(dados_prontos$broad_age)),
+    ncol = 2
+  ) +
+  theme_void() +
+  theme(
+    theme(
+        strip.text = element_text(
+          size = 14,
+          face = "bold",
+          angle = 0,
+          hjust = 0.5,
+          margin = margin(b = 5, t = 2)
+        ),
+        strip.background = element_blank(),
+        legend.position = "bottom",
+        plot.background = element_rect(fill = "white", colour = NA),
+        legend.text = element_text(size = 12),
+        panel.spacing = unit(0.3, "lines")
+      )
+  )
+```
+
+### ssGSEA
+
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
 ```{r ssGSEA Allen}
 #| echo: false
 #| warning: false
@@ -403,7 +700,11 @@ ggplot() +
     mapping = aes(fill = Score_Medio_ssGSEA)
   ) +
     scale_fill_viridis_c(
+<<<<<<< HEAD
     option = "viridis",
+=======
+    option = "viridis", # Opções boas: "viridis", "magma", "inferno", "plasma"
+>>>>>>> d760d85223431647f6cec163e86c3bc8cab34cb7
     name = "ssGSEA Score"
   ) +
   facet_wrap(
