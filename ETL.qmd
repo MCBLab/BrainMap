@@ -15,7 +15,6 @@ format:
 editor: visual
 ---
 
-
 ![](https://mcblab.github.io/images/logos/lab_icon_long.png){width="200px"} This analysis was performed by [MCB Lab](https://mcblab.github.io/).
 
 ```{r library}
@@ -215,7 +214,6 @@ columns_enriquecidas <- columns_renomeado %>%
 mapeamento_rapido <- columns_enriquecidas %>%
   select(column_num, broad_age, structure_mapped)
 
-# Salvar os dados otimizados com todas as informações de mapeamento
 dados_app <- list(
   expression_matrix = matriz_final,
   col_meta = columns_enriquecidas,
@@ -227,14 +225,14 @@ dados_app <- list(
   )
 )
 
-saveRDS(dados_app, "dados_otimizados_Allen.rds")
+saveRDS(dados_app, "dados_otimizados.rds")
 ```
 
 ```{r Ontology create dataset}
 #| echo: false
 #| eval: false
 #| warning: false
-dados_app <- readRDS("~/dados_otimizados_Allen.rds")
+dados_app <- readRDS("~/dados_otimizados.rds")
 
 matrix_dados <- as.matrix(dados_app$expression_matrix)
 matrix_dados <- log2(matrix_dados + 1)
@@ -248,9 +246,6 @@ geneont_df <- msigdbr(species = "Homo sapiens", collection = "C5")
 all_genesets_df <- bind_rows(h_df, biocarta_df, kegg_df, reactome_df, geneont_df)
 
 genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
-
-matrix_dados <- as.matrix(dados_app$expression_matrix)
-matrix_dados <- log2(matrix_dados + 1)
 
 # ssGSEA Score
 ssgsea_param <- ssgseaParam(exprData = matrix_dados, geneSets = genesets_list)
@@ -283,8 +278,58 @@ A via escolhida para vizualização teste, com base no método de variação da 
 #| echo: false
 #| warning: false
 
-dados_app <- readRDS("~/dados_otimizados_Allen.rds")
+dados_app <- readRDS("~/dados_otimizados.rds")
 tabela_final_ssgsea <- read.csv("~/ontologyssGSEA.csv")
+```
+
+```{r Gene}
+meu_gene <- "SOX10" 
+
+valores_expressao <- matrix_dados[meu_gene, ]
+
+dados_gene_plot <- data.frame(
+  Amostra = as.numeric(colnames(matrix_dados)),
+  Expressao = as.numeric(valores_expressao)) %>%
+  left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+  rename(region = structure_mapped) %>% 
+  filter(!is.na(region), !is.na(broad_age)) %>%
+  group_by(broad_age, region) %>%
+  summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
+
+dados_gene_plot %>% 
+ggplot() +
+  geom_brain(
+    atlas = ggseg::dk(),
+   position = position_brain(c(
+      "right lateral", "right medial")),
+    mapping = aes(fill = log2(Expressao_Media))
+  ) +
+    scale_fill_gradient2(
+    low = "royalblue",
+    mid = "firebrick",
+    high = "goldenrod",
+    midpoint = 0,
+    name = "Score"
+  ) +
+  facet_wrap(
+    ~ factor(broad_age, levels = unique(dados_gene_plot$broad_age)),
+    ncol = 2
+  ) +
+  theme_void() +
+    theme(
+        strip.text = element_text(
+          size = 14,
+          face = "bold",
+          angle = 0,
+          hjust = 0.5,
+          margin = margin(b = 5, t = 2)
+        ),
+        strip.background = element_blank(),
+        legend.position = "bottom",
+        plot.background = element_rect(fill = "white", colour = NA),
+        legend.text = element_text(size = 12),
+        panel.spacing = unit(0.3, "lines")
+      )
 ```
 
 ```{r ggseg ssGSEA}
@@ -339,7 +384,7 @@ ggplot() +
 
 ```
 
-## Allen 
+## Allen
 
 Retirado do www.brainspan.org, os dados de scRNA-seq utilizados para a seguinte vizualização foram retirados de tercido Humano em um intervalo temporal que cobriu quase toda a extensão da vida humana, com amostras variando desde as 5 semanas pós-concepcionais (PCW) até os 64 anos de idade pós-natal.
 
@@ -348,11 +393,7 @@ Retirado do www.brainspan.org, os dados de scRNA-seq utilizados para a seguinte 
 #| warning: false
 
 columns <- dados_app$col_meta
-gene_list <- c("MEF2C", "ZNF184", "TCF4", "FEZF2", "SOX5", "TBR1", 
-               "SATB2", "NR4A2", "TSHZ3", "CTC-467M3.3", "LINC01415", 
-               "GRAP2", "SATB1", "ARHGAP15", "UNC5D", "EMX1", "EXOC3L4", 
-               "RP11-434H14.1", "RP11-562L8.1", "RP5-896L10.1", "RSPO3", 
-               "SATB2-AS1", "SNX7", "ARL14EP", "CTTNBP2", "DPP4", "GUCY1A2")
+gene_list <- dados_app$gene_list
 
 matrix_dados_allen <- as.matrix(dados_app$expression_matrix)
 matrix_dados_allen[is.infinite(matrix_dados_allen)] <- 0
@@ -369,7 +410,7 @@ custom_gene_set <- list("Custom_Signature" = genes_validos)
     params_custom_ssgsea <- ssgseaParam(
       exprData = matrix_dados_allen,
       geneSets = custom_gene_set,
-      normalize = TRUE
+      normalize = FALSE
     )
     
     gsva_score_matrix_ssgsea <- gsva(params_custom_ssgsea)
@@ -388,7 +429,7 @@ tabela_final_ssgsea_allen <- as.data.frame(gsva_score_matrix_ssgsea) %>%
 
 Com base em Mingfeng et al., estamos observando um módulo obtido a partir do WGCNA, o ME37, onde foi observado que este módulo no decorrer do desenvolvimento apresenta sua maior taxa de mudança (flutuação de expressão) no neocórtex durante a transição do período fetal. Tentaremos observar como a ferramenta BrainMap poderá representar isso,
 
-```{r GSVA Allen}
+```{r ssGSEA Allen}
 #| echo: false
 #| warning: false
 dados_prontos <- tabela_final_gsva_allen %>%
@@ -402,7 +443,7 @@ dados_prontos <- tabela_final_gsva_allen %>%
     !is.na(Score_GSVA)
   ) %>%
   group_by(broad_age, region) %>%
-  summarise(Score_Medio_GSVA = mean(Score_GSVA, na.rm = TRUE), .groups = "drop")
+  summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
 
 dados_prontos %>% 
 ggplot() +
@@ -410,11 +451,11 @@ ggplot() +
     atlas = ggseg::dk(), 
    position = position_brain(c(
       "right lateral", "right medial")),
-    mapping = aes(fill = Score_Medio_GSVA)
+    mapping = aes(fill = Score_Medio_ssGSEA)
   ) +
     scale_fill_viridis_c(
     option = "viridis", 
-    name = "GSVA Score"
+    name = "ssGSEA Score"
   ) +
   facet_wrap(
     ~ factor(broad_age, levels = unique(dados_prontos$broad_age)),

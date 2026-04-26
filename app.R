@@ -276,9 +276,13 @@ server <- function(input, output, session) {
     user_genes <- unique(trimws(unlist(strsplit(input$gene_input_list, "\n")))) #trimws -> remove espaços extras
     user_genes <- user_genes[user_genes != ""] #remove linhas vazias
     
-    # Validar se os genes existem na matriz X
-    genes_validos <- intersect(user_genes, rownames(X))
-    genes_ausentes <- setdiff(user_genes, rownames(X))
+    matrix_dados_allen <- as.matrix(dados_app$expression_matrix)
+    matrix_dados_allen[is.infinite(matrix_dados_allen)] <- 0
+    
+    matrix_dados_allen <- matrix_dados_allen[rowSums(matrix_dados_allen != 0) > 0, ]
+    
+    genes_validos <- intersect(gene_list, rownames(matrix_dados_allen))
+    genes_ausentes <- setdiff(gene_list, rownames(matrix_dados_allen))
     
     if (length(genes_validos) == 0) {
       showNotification(
@@ -294,20 +298,18 @@ server <- function(input, output, session) {
         type = "warning"
       )
     }
-    
-    # Lista de Gene Sets
+  
     custom_gene_set <- list("Custom_Signature" = genes_validos)
     
-    # Configurar parametros e rodar GSVA
-    params_custom <- gsvaParam(
-      exprData = X,
+    params_custom_ssgsea <- ssgseaParam(
+      exprData = matrix_dados_allen,
       geneSets = custom_gene_set,
-      kcdf = "Gaussian"
-    ) # Gaussian -> dados em log2
+      normalize = TRUE
+    )
     
-    gsva_score_matrix <- gsva(params_custom)
+    gsva_score_matrix_ssgsea <- gsva(params_custom_ssgsea)
     
-    return(list(scores = gsva_score_matrix, missing = genes_ausentes))
+    return(list(scores = gsva_score_matrix_ssgsea, missing = genes_ausentes))
   })
   
   # Renderizando o Plot do GSVA
@@ -319,6 +321,14 @@ server <- function(input, output, session) {
       
       score_matrix <- resultados$scores
       genes_ausentes <- resultados$missing
+      
+      tabela_final_ssgsea_allen <- as.data.frame(gsva_score_matrix_ssgsea) %>%
+        rownames_to_column(var = "GeneSet") %>%
+        pivot_longer(
+          cols = -GeneSet,          
+          names_to = "Amostra",
+          values_to = "Score_ssGSEA"
+        )
       
       #Condicional para a ausencia dos genes
       if (length(genes_ausentes) == 0) {
@@ -334,29 +344,33 @@ server <- function(input, output, session) {
         )
       }
       
-      plot_data_gsva <- data.frame(
-        column_num = colnames(score_matrix),
-        gsva_score = as.numeric(score_matrix[1, ])
-      ) %>%
-        mutate(column_num = as.integer(column_num)) %>%
-        left_join(columns, by = "column_num") %>%
-        rename(region = structure_mapped)
+      dados_prontos <- tabela_final_gsva_allen %>%
+        mutate(Amostra = as.numeric(Amostra)) %>%
+        left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
+        rename(region = structure_mapped) %>%
+        filter(
+          GeneSet == "Custom_Signature", 
+          !is.na(region),        
+          !is.na(broad_age),
+          !is.na(Score_GSVA)
+        ) %>%
+        group_by(broad_age, region) %>%
+        summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
       
       plot_data_gsva %>%
         filter(!is.na(region)) %>%
         group_by(broad_age) %>%
-        ggseg(
-          .data = .,
-          hemisphere = "left",
-          colour = "black",
-          mapping = aes(fill = gsva_score)
+        dados_prontos %>% 
+        ggplot() +
+        geom_brain(
+          atlas = ggseg::dk(), 
+          position = position_brain(c(
+            "right lateral", "right medial")),
+          mapping = aes(fill = Score_Medio_ssGSEA)
         ) +
-        scale_fill_gradient2(
-          low = "royalblue",
-          mid = "firebrick",
-          high = "goldenrod",
-          midpoint = 0,
-          name = "GSVA Score"
+        scale_fill_viridis_c(
+          option = "viridis", 
+          name = "ssGSEA Score"
         ) +
         labs(
           title = "Enriquecimento da Assinatura Personalizada nas Áreas Cerebrais",
