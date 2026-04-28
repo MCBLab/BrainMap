@@ -22,6 +22,9 @@ tabela_base_ontologias <- tabela_final_ssgsea %>%
   mutate(Amostra = as.numeric(Amostra)) %>%
   inner_join(meta_limpo, by = c("Amostra" = "column_num"))
 
+setgenes <- unique(dados_app$gene_list)
+setontologies <- unique(tabela_final_ssgsea$GeneSet)
+
 #* @filter cors
 cors <- function(res) {
   res$setHeader("Access-Control-Allow-Origin", "*")
@@ -30,13 +33,13 @@ cors <- function(res) {
 
 #* @get /list_genes
 function(){
-  unique(dados_app$gene_list)
+  setgenes
 }
 
 #* @get /list_ontologies
 function() {
   # Retorna um vetor único de GeneSets para o front-end montar a lista
-  unique(tabela_final_ssgsea$GeneSet)
+  setontologies
 }
 
 #* Retorna o plot do cérebro com a expressão do gene selecionado
