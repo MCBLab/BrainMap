@@ -28,17 +28,28 @@ BiocManager::install("GSVA")
 
 ## 📂 Data Preparation
 
-Before running the app, you must process the raw BrainSpan CSV files into an optimized format.
+Before running the application, you must process the raw BrainSpan data and calculate the ontology enrichment scores. This is a two-step process based on the provided scripts:
 
-1.  Ensure the `genes_matrix_csv/` directory contains:
-    - `expression_matrix.csv`
-    - `rows_metadata.csv`
-    - `columns_metadata.csv`
-2.  Run the preparation script:
-    ```bash
-    Rscript preparaDados.R
-    ```
-    This script generates `dados_otimizados.rds`, which includes mapped brain regions and pre-calculated age groups.
+### 1. Prepare the Expression Matrix
+Ensure the `genes_matrix_csv/` directory contains:
+- `expression_matrix.csv`
+- `rows_metadata.csv`
+- `columns_metadata.csv`
+
+Run the preparation script from your terminal:
+```bash
+Rscript preparaDados.R
+```
+This script generates `dados_otimizados.rds`, which includes mapped brain regions, filtered gene lists, and pre-calculated age groups.
+
+### 2. Generate Ontology Scores (ssGSEA)
+The API also requires the `ontologyssGSEA.csv` file to serve the pathway visualization endpoints. This file is generated via the **`ETL.qmd`** document.
+
+1. Open `ETL.qmd` (e.g., in RStudio, VSCode, or via the command line).
+2. Ensure you have the `dados_otimizados.rds` file from the previous step.
+3. Run the **"Ontology create dataset"** code chunk inside the document. 
+
+This will load the optimized data, fetch gene sets from `msigdbr`, run the GSVA calculations, and output the final `ontologyssGSEA.csv` file to your root directory.
 
 ## 🏃 Running the Application
 
@@ -50,14 +61,44 @@ shiny::runApp()
 
 ## 🐳 Docker Support
 
-A `Dockerfile` is provided for containerized deployment. To build and run:
+The full application stack (React Frontend + Plumber API) can be easily served via Docker Compose.
+
+### Using Docker Compose (Recommended)
+
+The easiest way to build and run the complete application is using Docker Compose:
 
 ```bash
-# Build the image
-docker build -t devbrain-markers .
+docker-compose up --build -d
+```
 
-# Run the container
-docker run -p 3838:3838 devbrain-markers
+This will automatically start both services:
+- **React Frontend**: `http://localhost:5173`
+- **Plumber API**: `http://localhost:33857` *(Swagger Docs available at `http://localhost:33857/__docs__/`)*
+
+### Live Reloading during Development
+
+Docker Compose is configured to automatically sync your code changes during development without needing full container rebuilds. 
+
+Instead of `docker-compose up`, use the `watch` command:
+
+```bash
+docker compose watch
+```
+
+With this running:
+- Any edits saved to `plumber.R` will instantly sync and restart the API container.
+- Any edits saved in the `front/` directory will instantly trigger Vite's Hot Module Replacement (HMR) and update the frontend live in your browser.
+
+### Using Docker Manually (API Only)
+
+If you wish to run *only* the backend API, you can build and run it directly:
+
+```bash
+# Build the API image
+docker build -t devbrain-markers-api -f Dockerfile.api .
+
+# Run the API container
+docker run -p 33857:33857 devbrain-markers-api
 ```
 
 ## 📊 Data Source
