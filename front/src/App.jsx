@@ -14,6 +14,9 @@ function App() {
   // NOVO ESTADO: Controla se a imagem está sendo gerada pelo R
   const [carregandoImagem, setCarregandoImagem] = useState(false);
 
+  // NOVO ESTADO: O valor digitado na busca (usado para otimizar a renderização)
+  const [inputValue, setInputValue] = useState('');
+
   useEffect(() => {
     setCarregandoLista(true);
     setOpcoes([]);
@@ -89,9 +92,19 @@ function App() {
             setSelecionada(opcao);
             setCarregandoImagem(true); // Quando troca a opção, liga o aviso de "Carregando"
           }}
-          options={opcoes}
+          onInputChange={(valor, { action }) => {
+            // Só atualiza o texto se o usuário digitou ou apagou
+            if (action === 'input-change' || action === 'set-value' || action === 'menu-close') {
+              setInputValue(valor);
+            }
+          }}
+          options={opcoes
+            .filter((opcao) => opcao.label.toLowerCase().includes(inputValue.toLowerCase()))
+            .slice(0, 100) // Exibe no máximo 100 opções para evitar travamento do DOM
+          }
           isLoading={carregandoLista}
           isSearchable={true}
+          filterOption={null} // Desativa filtro interno pois estamos filtrando manualmente acima
           placeholder="Digite para buscar..."
           noOptionsMessage={() => "Nenhum resultado encontrado"}
         />
