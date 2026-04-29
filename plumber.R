@@ -64,7 +64,7 @@ function(gene = "SOX10") {
   p <- dados_gene_plot %>% 
     ggplot() +
     geom_brain(
-      atlas = ggseg::dk(),
+      atlas = ggseg::dk,
       position = position_brain(c("right lateral", "right medial")),
       mapping = aes(fill = log2(Expressao_Media))
     ) +
@@ -106,7 +106,7 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS") {
   p <- dados_prontos %>% 
     ggplot() +
     geom_brain(
-      atlas = ggseg::dk(),
+      atlas = ggseg::dk,
       position = position_brain(c("right lateral", "right medial")),
       mapping = aes(fill = Score_Medio_ssGSEA)
     ) +
