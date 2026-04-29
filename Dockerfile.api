@@ -1,0 +1,43 @@
+FROM rocker/tidyverse:4.3.2
+
+# Install system dependencies required for ggseg and plumber
+RUN apt-get update && apt-get install -y \
+    libxml2-dev \
+    libssl-dev \
+    libcurl4-openssl-dev \
+    libfontconfig1-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    libtiff5-dev \
+    libjpeg-dev \
+    libcairo2-dev \
+    libudunits2-dev \
+    libproj-dev \
+    libgdal-dev \
+    libgeos-dev \
+    libsodium-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install necessary R packages
+RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis'), dependencies = TRUE, repos='https://cloud.r-project.org/')"
+
+# Install ggseg
+RUN R -e "install.packages('ggseg')"
+
+# Create directory for the API
+RUN mkdir -p /api
+
+# Copy necessary files
+COPY plumber.R /api/
+COPY dados_otimizados.rds /api/
+COPY ontologyssGSEA.csv /api/
+
+WORKDIR /api
+
+# The port expected by the front-end as per plumber.R
+EXPOSE 33857
+
+# Command to start the Plumber API
+CMD ["R", "-e", "pr <- plumber::plumb('plumber.R'); pr$run(host = '0.0.0.0', port = 33857, docs = TRUE)"]
