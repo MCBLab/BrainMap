@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y \
 # Install necessary R packages
 RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis'), dependencies = TRUE, repos='https://cloud.r-project.org/')"
 
+RUN R -e "if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
+    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE)"
+
 # Install ggseg
 RUN R -e "install.packages('ggseg')"
 
