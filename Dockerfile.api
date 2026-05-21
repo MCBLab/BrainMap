@@ -18,10 +18,12 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libgeos-dev \
     libsodium-dev \
+    libfontconfig1-dev \
+    libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install necessary R packages
-RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis'), dependencies = TRUE, repos='https://cloud.r-project.org/')"
+RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), dependencies = TRUE, repos='https://cloud.r-project.org/')"
 
 RUN R -e "if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
     BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE)"
