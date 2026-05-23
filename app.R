@@ -184,10 +184,10 @@ server <- function(input, output, session) {
         .data = .,
         hemisphere = "left",
         colour = "black",
-        mapping = aes(fill = log2(expression_value))
+        mapping = aes(fill = expression_value)
       ) +
-      scale_fill_gradientn(
-        colours = c("royalblue", "firebrick", "goldenrod"),
+      scale_fill_gradient(
+        low = "blue", high = "orange",
         na.value = "white"
       ) +
       labs(

@@ -235,7 +235,6 @@ saveRDS(dados_app, "dados_otimizados.rds")
 dados_app <- readRDS("~/dados_otimizados.rds")
 
 matrix_dados <- as.matrix(dados_app$expression_matrix)
-matrix_dados <- log2(matrix_dados + 1)
 
 h_df <- msigdbr(species = "Homo sapiens", category = "H")
 biocarta_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:BIOCARTA")
@@ -302,13 +301,11 @@ ggplot() +
     atlas = ggseg::dk(),
    position = position_brain(c(
       "right lateral", "right medial")),
-    mapping = aes(fill = log2(Expressao_Media))
+    mapping = aes(fill = Expressao_Media)
   ) +
-    scale_fill_gradient2(
-    low = "royalblue",
-    mid = "firebrick",
-    high = "goldenrod",
-    midpoint = 0,
+    scale_fill_gradient(
+    low = "blue",
+    high = "orange",
     name = "Score"
   ) +
   facet_wrap(
