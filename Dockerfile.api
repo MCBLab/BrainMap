@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y \
     libsodium-dev \
     libfontconfig1-dev \
     libcairo2-dev \
+    cmake \
+    libabsl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install necessary R packages
@@ -28,8 +30,8 @@ RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata'
 RUN R -e "if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
     BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE)"
 
-# Install ggseg
-RUN R -e "install.packages('ggseg')"
+# Install latest ggseg from r-universe
+RUN R -e "options(warn = 2); options(repos = c(ggsegverse = 'https://ggsegverse.r-universe.dev', CRAN = 'https://cloud.r-project.org')); install.packages('ggseg')"
 
 # Create directory for the API
 RUN mkdir -p /api
