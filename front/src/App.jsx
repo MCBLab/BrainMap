@@ -20,8 +20,10 @@ function App() {
 
       {/* Footer (Opcional, vindo do modelo do Stitch) */}
       <footer className="w-full bg-white border-t border-zinc-100 px-12 py-6">
-        <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#596061]">
-          © 2024 ExpressionBrainMap. Genomic Precision Framework.
+        <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#596061] text-center">
+          <a href="https://mcblab.github.io/" target="_blank" rel="noopener noreferrer" className="hover:text-[#2d3435] transition-colors">
+            Made by MCB Lab at UFRN
+          </a>
         </div>
       </footer>
     </div>
