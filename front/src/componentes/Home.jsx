@@ -20,6 +20,7 @@ export default function Home() {
 
   // Busca lista de Genes ou Ontologias no R (com Retry automático)
   useEffect(() => {
+    setSelecionada(null);
     if (abaAtual === 'genelist') return;
 
     let montado = true;
