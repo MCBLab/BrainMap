@@ -1,0 +1,29 @@
+services:
+  plumber-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "33857:33857"
+    restart: unless-stopped
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./plumber.R
+          target: /api/plumber.R
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - plumber-api
+    develop:
+      watch:
+        - action: sync
+          path: ./front
+          target: /app
+          ignore:
+            - node_modules/
