@@ -75,6 +75,7 @@ export default function Home() {
   };
 
   // FUNÇÃO: Processar Genelist Nova
+  // FUNÇÃO: Processar Genelist Nova
   const gerarMapaLista = async () => {
     if (!textoListaGenes.trim()) return; 
     
@@ -82,11 +83,38 @@ export default function Home() {
     setSelecionada({ label: "Lista Customizada" }); 
     atualizarHistorico(textoListaGenes, 'genelist');
 
+    // 1. Limpa o aviso da pesquisa anterior para não acumular
+    setGenesInvalidos([]);
+    setMostrarModalGenes(false);
+
     try {
       const params = new URLSearchParams();
       params.append('gene_string', textoListaGenes);
       params.append('escala', escalaRegiao);
 
+      // 2. CHECAGEM RÁPIDA: Quem existe e quem não existe?
+      const resValidacao = await fetch('http://127.0.0.1:33857/validate_genelist', {
+        method: 'POST', body: params
+      });
+      const dadosValidacao = await resValidacao.json();
+
+      // Formata a resposta do R com segurança
+      const listaInvalidos = Array.isArray(dadosValidacao.invalidos) ? dadosValidacao.invalidos : dadosValidacao.invalidos?.[0] || [];
+      const listaValidos = Array.isArray(dadosValidacao.validos) ? dadosValidacao.validos : dadosValidacao.validos?.[0] || [];
+
+      // Se houver algum erro, salva no Estado (Isso faz a caixa amarela aparecer!)
+      if (listaInvalidos.length > 0) {
+        setGenesInvalidos(listaInvalidos); 
+      }
+
+      // Se TUDO estiver errado, para por aqui e avisa
+      if (listaValidos.length === 0) {
+        alert("Nenhum dos genes informados foi encontrado na base de dados.");
+        setCarregandoImagem(false);
+        return; 
+      }
+
+      // 3. GERAÇÃO DA IMAGEM
       const resposta = await fetch('http://127.0.0.1:33857/plot_genelist', {
         method: 'POST', body: params
       });
@@ -262,22 +290,22 @@ export default function Home() {
 
           {/* HISTÓRICO RECENTE */}
           {historicoAtivo.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-zinc-200">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Recent:</span>
-              <div className="flex flex-wrap gap-2">
-                {historicoAtivo.map((termo, idx) => (
-                  <button 
-                    key={idx}
-                    onClick={() => carregarDoHistorico(termo)}
-                    className="bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-600 text-[11px] font-medium px-3 py-1.5 rounded-full transition-colors max-w-full truncate"
-                    title={termo}
-                  >
-                    {termo.length > 25 ? termo.substring(0, 25) + '...' : termo}
-                  </button>
-                ))}
+              <div className="mt-8 pt-6 border-t border-zinc-200">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-3">Recent:</span>
+                <div className="flex flex-wrap gap-2">
+                  {historicoAtivo.map((termo, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => carregarDoHistorico(termo)}
+                      className="bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-600 text-[11px] font-medium px-3 py-1.5 rounded-full transition-colors max-w-full truncate"
+                      title={termo}
+                    >
+                      {termo.length > 25 ? termo.substring(0, 25) + '...' : termo}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
         </div>
 
@@ -285,22 +313,22 @@ export default function Home() {
         <div className="lg:col-span-8 flex flex-col gap-4">
           
             {/* 1. COLE O TRECHO DO AVISO EXATAMENTE AQUI (NO TOPO DA COLUNA) */}
-  {genesInvalidos.length > 0 && (
-    <div className="bg-[#fff8e6] border border-[#f0dca5] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-[#8c6d1f] font-medium">
-          ⚠️ <strong>{genesInvalidos.length} gene(s)</strong> não foram encontrados no banco e foram ignorados.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(genesInvalidos.join('\n'));
-              alert('Genes copiados para a área de transferência!');
-            }}
-            className="text-[11px] font-bold uppercase tracking-widest bg-white border border-[#f0dca5] text-[#8c6d1f] px-4 py-2 rounded-lg hover:bg-[#fcf4dc] transition-colors"
-          >
-            Copiar Genes
-          </button>
+        {genesInvalidos.length > 0 && (
+          <div className="bg-[#fff8e6] border border-[#f0dca5] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-[#8c6d1f] font-medium">
+                ⚠️ <strong>{genesInvalidos.length} gene(s)</strong> não foram encontrados no banco e foram ignorados.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(genesInvalidos.join('\n'));
+                    alert('Genes copiados para a área de transferência!');
+                  }}
+                  className="text-[11px] font-bold uppercase tracking-widest bg-white border border-[#f0dca5] text-[#8c6d1f] px-4 py-2 rounded-lg hover:bg-[#fcf4dc] transition-colors"
+                >
+                  Copiar Genes
+                </button>
           
           <button
             onClick={() => setMostrarModalGenes(!mostrarModalGenes)}

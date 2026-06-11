@@ -166,12 +166,6 @@ function(gene_string = "", escala = "micro") {
 
   if (length(genes_validos) == 0) stop("Erro: Nenhum dos genes fornecidos foi encontrado na base de dados.")
 
-  texto_aviso <- NULL
-  if (length(genes_invalidos) > 0) {
-    exemplo <- paste(head(genes_invalidos, 5), collapse = ", ")
-    sufixo <- ifelse(length(genes_invalidos) > 5, "...", "")
-    texto_aviso <- paste("⚠️ Aviso:", length(genes_invalidos), "gene(s) ignorado(s) (ex:", exemplo, sufixo, ")")
-  }
 
   ssgsea_parametros <- GSVA::ssgseaParam(
     exprData = as.matrix(matrix_dados),
@@ -204,7 +198,7 @@ function(gene_string = "", escala = "micro") {
 
   escala <- scale_fill_viridis_c(option = "magma", name = "Custom ssGSEA", na.value = "darkgray")
   
-  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala, caption_text = texto_aviso)
+  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
 }
 
