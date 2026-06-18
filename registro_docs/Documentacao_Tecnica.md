@@ -11,11 +11,11 @@ O sistema *VEGAbrain* é estruturado em uma arquitetura cliente-servidor (Fronte
 ## Fluxograma de Funcionamento da Aplicação
 
 1. **Acesso do Usuário:** O usuário interage com o front-end React na porta local / web padrão.
-2. **Entrada de Dados:** O usuário escolhe um gene único ou providencia uma lista customizada (assinatura gênica).
+2. **Entrada de Dados:** O usuário escolhe um gene único, ou uma via ontológica, ou providencia uma lista customizada (assinatura gênica).
 3. **Requisição HTTP:** O frontend envia a lista encapsulada em um POST/GET request para a API Plumber rodando na porta alocada (ex. 33857).
 4. **Processamento Back-end:**
    - Para genes únicos: A API localiza as quantificações na matriz BrainSpan, filtra e constrói um *data frame*.
-   - Para listas de genes (GSVA): O pacote R `GSVA` constrói pontuações ssGSEA de enriquecimento amostra-a-amostra.
+   - Para listas de genes (GSVA): O pacote R `GSVA` constrói pontuações ssGSEA(score composto) de enriquecimento amostra-a-amostra.
 5. **Renderização Visual:** A biblioteca geométrica gráfica `ggseg` mapeia os escores nas subdivisões anatômicas de imagens hemisféricas laterais e mediais cerebrais para as 5 faixas etárias.
 6. **Resposta:** O plot codificado como SVG e os respectivos dados na forma de `.csv` são devolvidos ao Front-end, que o apresenta na tela do usuário para análise e exportação.
 
