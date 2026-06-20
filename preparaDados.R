@@ -1,8 +1,12 @@
 library(vroom)
 library(dplyr)
 library(tibble)
+library(msigdbr)
+library(tidyr) 
+library(GSVA)   
+library(readr)
 
-
+#Carregando matrizes de dados do BrainSpan
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
 
@@ -18,6 +22,7 @@ rownames(matriz_expressao) <- rows$gene_symbol
 
 genes_unicos <- !duplicated(rownames(matriz_expressao))
 matriz_expressao <- matriz_expressao[genes_unicos, ]
+
 matriz_final <- log2(matriz_expressao + 1)
 
 # Mapping dataframes
@@ -99,9 +104,54 @@ output_values <- c(
   "frontal pole"
 )
 
+output_values_macro <- c(
+  NA, 
+  "lobo temporal", 
+  "lobo frontal", 
+  "lobo temporal",
+  "lobo parietal",
+  "lobo temporal",
+  "lobo occipital",
+  "lobo frontal",
+  "lobo temporal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo parietal",
+  "lobo temporal",
+  "lobo parietal",
+  "lobo temporal",
+  "lobo temporal",
+  "lobo temporal",
+  "lobo frontal",
+  "lobo frontal",
+  "lobo occipital",
+  "lobo temporal",
+  "lobo parietal",
+  "lobo temporal",
+  "lobo frontal",
+  "lobo temporal",
+  "lobo frontal",
+  "lobo occipital",
+  "lobo frontal",
+  "lobo parietal",
+  "lobo frontal",
+  "lobo frontal"
+  )
+
 mapping_df <- data.frame(
   region = input_values,
   structure_name = output_values,
+  stringsAsFactors = FALSE
+)
+
+mapping_macro <- data.frame(
+  region = input_values,
+  macro_region = output_values_macro,
   stringsAsFactors = FALSE
 )
 
@@ -154,13 +204,14 @@ age_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Renomear a coluna structure_name para evitar conflito
+# Renomeando as colulas
 columns_renomeado <- columns %>%
   rename(structure_original = structure_name)
 
 columns_enriquecidas <- columns_renomeado %>%
   left_join(mapping_df, by = c("structure_original" = "structure_name")) %>%
   left_join(age_df, by = "age") %>%
+  left_join(mapping_macro, by = "region") %>%
   mutate(
     structure_mapped = region
   ) %>%
@@ -171,24 +222,52 @@ columns_enriquecidas <- columns_renomeado %>%
     age,
     broad_age,
     structure_original,
-    structure_mapped
+    structure_mapped,
+    macro_region
   )
 
-# Criar uma versão simplificada apenas com o necessário para joins rápidos
 mapeamento_rapido <- columns_enriquecidas %>%
-  select(column_num, broad_age, structure_mapped)
+  select(column_num, broad_age, structure_mapped, macro_region)
 
 # Salvar os dados otimizados com todas as informações de mapeamento
 dados_app <- list(
   expression_matrix = matriz_final,
-  col_meta = columns_enriquecidas, # Agora com os mapeamentos incluídos
+  col_meta = columns_enriquecidas,
   gene_list = rownames(matriz_final),
   mapping_info = list(
     region_to_structure = mapping_df,
+    region_to_macro_structure = mapping_macro,
     age_groups = age_df,
     quick_lookup = mapeamento_rapido
   )
 )
 
-# Salvar o arquivo RDS
+#Criando dados para as Ontologias
+matrix_dados <- as.matrix(dados_app$expression_matrix)
+
+h_df <- msigdbr(species = "Homo sapiens", category = "H")
+biocarta_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:BIOCARTA")
+kegg_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG_LEGACY")
+reactome_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+geneont_df <- msigdbr(species = "Homo sapiens", collection = "C5")
+
+all_genesets_df <- bind_rows(h_df, biocarta_df, kegg_df, reactome_df, geneont_df)
+
+genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
+
+# ssGSEA Score
+ssgsea_param <- ssgseaParam(exprData = matrix_dados, geneSets = genesets_list)
+ssgsea_results <- gsva(ssgsea_param)
+
+tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
+  rownames_to_column(var = "GeneSet") %>%
+  pivot_longer(
+    cols = -GeneSet,          
+    names_to = "Amostra",
+    values_to = "Score_ssGSEA"
+  )
+
+
 saveRDS(dados_app, "dados_otimizados.rds")
+saveRDS(genesets_list, "genesets_list.rds")
+write_csv(tabela_final_ssgsea, "ontologyssGSEA.csv")
