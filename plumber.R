@@ -13,6 +13,7 @@ cors <- function(res) {
 
 dados_app <- readRDS("dados_otimizados.rds")
 tabela_final_ssgsea <- read.csv("ontologyssGSEA.csv")
+genesets_list <- readRDS("genesets_list.rds")
 
 matrix_dados <- dados_app$expression_matrix
 
@@ -317,4 +318,18 @@ function(gene_string = "") {
     validos = genes_validos,
     invalidos = genes_invalidos
   ))
+}
+
+#* Retorna os genes da ontologia selecionada
+#* @param geneset Nome da ontologia
+#* @get /genes_da_via
+function(geneset = "") {
+  if (geneset == "" || is.null(genesets_list[[geneset]])) {
+    return(list(genes = character(0)))
+  }
+  
+  genes_da_via <- genesets_list[[geneset]]
+  genes_presentes <- intersect(genes_da_via, rownames(matrix_dados))
+  
+  return(list(genes = as.character(genes_presentes)))
 }

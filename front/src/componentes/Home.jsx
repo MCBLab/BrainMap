@@ -19,6 +19,10 @@ export default function Home() {
   const [genesInvalidos, setGenesInvalidos] = useState([]);
   const [mostrarModalGenes, setMostrarModalGenes] = useState(false);
 
+  const [genesDaVia, setGenesDaVia] = useState([]);
+  const [mostrarGenesDaVia, setMostrarGenesDaVia] = useState(false);
+  const [carregandoGenesVia, setCarregandoGenesVia] = useState(false);
+
   // Buscando lista de Genes ou Ontologias no R (com Retry automático)
   useEffect(() => {
     setSelecionada(null);
@@ -74,7 +78,6 @@ export default function Home() {
     }
   };
 
-  // FUNÇÃO: Processar Genelist Nova
   // FUNÇÃO: Processar Genelist Nova
   const gerarMapaLista = async () => {
     if (!textoListaGenes.trim()) return; 
@@ -200,6 +203,39 @@ export default function Home() {
   // Histórico ativo atual
   const historicoAtivo = abaAtual === 'gene' ? historicoGene : abaAtual === 'ontology' ? historicoOntology : historicoGenelist;
 
+  const buscarGenesDaVia = async (nomeOntologia) => {
+    if (!nomeOntologia) return;
+    
+    setCarregandoGenesVia(true);
+    setMostrarGenesDaVia(true);
+    setGenesDaVia([]); 
+    
+    try {
+      // encodeURIComponent protege nomes complexos na hora de virar URL
+      const urlFetch = `http://127.0.0.1:33857/genes_da_via?geneset=${encodeURIComponent(nomeOntologia)}`;
+      
+      const res = await fetch(urlFetch);
+      const dados = await res.json();
+
+      let listaLimpa = [];
+      if (dados.genes && Array.isArray(dados.genes)) {
+        listaLimpa = dados.genes;
+      } else if (Array.isArray(dados)) {
+        listaLimpa = dados; 
+      } else if (dados.genes && typeof dados.genes === 'string') {
+        listaLimpa = [dados.genes];
+      }
+
+      setGenesDaVia(listaLimpa);
+
+    } catch (err) {
+      console.error("Erro ao buscar genes da via:", err);
+      setGenesDaVia(["Erro ao carregar os genes."]);
+    } finally {
+      setCarregandoGenesVia(false);
+    }
+  };
+
   return (
     <section className="max-w-7xl mx-auto px-12 py-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -254,21 +290,64 @@ export default function Home() {
             </div>
 
             {abaAtual !== 'genelist' ? (
-              <Select
-                value={selecionada}
-                onChange={(opt) => { 
-                  setSelecionada(opt); 
-                  atualizarHistorico(opt.value, abaAtual);
-                  setCarregandoImagem(true); 
-                }}
-                onInputChange={(val) => setInputValue(val)}
-                options={opcoes.filter(o => o.label.toLowerCase().includes(inputValue.toLowerCase())).slice(0, 100)}
-                filterOption={null}
-                styles={{ menu: (base) => ({ ...base, zIndex: 9999 }) }}
-                isLoading={carregandoLista}
-                placeholder="Digite para buscar..."
-                className="text-sm"
-              />
+              <div className="flex flex-col gap-3">
+                <Select
+                  value={selecionada}
+                  onChange={(opt) => { 
+                    setSelecionada(opt); 
+                    atualizarHistorico(opt.value, abaAtual);
+                    setCarregandoImagem(true); 
+                    setMostrarGenesDaVia(false); // Esconde a lista ao trocar de via
+                  }}
+                  onInputChange={(val) => setInputValue(val)}
+                  options={opcoes.filter(o => o.label.toLowerCase().includes(inputValue.toLowerCase())).slice(0, 100)}
+                  filterOption={null}
+                  styles={{ menu: (base) => ({ ...base, zIndex: 9999 }) }}
+                  isLoading={carregandoLista}
+                  placeholder="Digite para buscar..."
+                  className="text-sm"
+                />
+                
+                {/* BOTÃO E CAIXA DE GENES DA VIA (Só aparece na aba Ontology e se algo estiver selecionado) */}
+                {abaAtual === 'ontology' && selecionada && (
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => mostrarGenesDaVia ? setMostrarGenesDaVia(false) : buscarGenesDaVia(selecionada.value)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-[#58614c] bg-[#e4e9ea] hover:bg-zinc-300 py-2 rounded-lg transition-colors w-full"
+                    >
+                      {mostrarGenesDaVia ? 'Esconder Genes da Via' : '👁️ Ver Genes desta Via'}
+                    </button>
+
+                    {mostrarGenesDaVia && (
+                      <div className="bg-white p-3 rounded-lg border border-zinc-200 shadow-inner animate-fade-in">
+                        {carregandoGenesVia ? (
+                          <p className="text-xs text-zinc-400 text-center py-4">Carregando genes...</p>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-zinc-500">{genesDaVia.length} genes encontrados no mapa:</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(genesDaVia.join('\n'));
+                                  alert('Genes copiados!');
+                                }}
+                                className="text-[10px] bg-zinc-100 hover:bg-zinc-200 text-zinc-700 px-2 py-1 rounded"
+                              >
+                                Copiar
+                              </button>
+                            </div>
+                            <textarea
+                              readOnly
+                              value={genesDaVia.join('\n')}
+                              className="w-full bg-zinc-50 text-zinc-600 font-mono text-[10px] p-2 rounded border border-zinc-200 outline-none resize-y h-24"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : (
               <div>
                 <textarea 

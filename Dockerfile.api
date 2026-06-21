@@ -46,6 +46,7 @@ RUN mkdir -p /api
 COPY plumber.R /api/
 COPY dados_otimizados.rds /api/
 COPY ontologyssGSEA.csv /api/
+COPY genesets_list.rds /api/
 
 WORKDIR /api
 
