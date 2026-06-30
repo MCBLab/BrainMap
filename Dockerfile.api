@@ -24,14 +24,20 @@ RUN apt-get update && apt-get install -y \
     libabsl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install necessary R packages
-RUN R -e "install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), dependencies = TRUE, repos='https://cloud.r-project.org/')"
+ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
 
-RUN R -e "if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
-    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE)"
+# 3. Instalando library do R
+RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
+    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), Ncpus = 1)"
 
-# Install latest ggseg from r-universe
-RUN R -e "options(warn = 2); options(repos = c(ggsegverse = 'https://ggsegverse.r-universe.dev', CRAN = 'https://cloud.r-project.org')); install.packages('ggseg')"
+# 4. Instalando pacotes do Bioconductor (GSVA)
+RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
+    if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
+    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)"
+
+# 5. Instalando o ggseg mais recente do r-universe
+RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"
+RUN R -e "remotes::install_github( 'ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never' )"
 
 # Create directory for the API
 RUN mkdir -p /api
@@ -40,6 +46,7 @@ RUN mkdir -p /api
 COPY plumber.R /api/
 COPY dados_otimizados.rds /api/
 COPY ontologyssGSEA.csv /api/
+COPY genesets_list.rds /api/
 
 WORKDIR /api
 

@@ -2,3 +2,4 @@
 genes_matrix_csv/
 dados_otimizados.rds
 ontologyssGSEA.csv
+genesets_list.rds

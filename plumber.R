@@ -11,16 +11,16 @@ cors <- function(res) {
   plumber::forward()
 }
 
-# 1. CARREGAMENTO DOS DADOS
 dados_app <- readRDS("dados_otimizados.rds")
 tabela_final_ssgsea <- read.csv("ontologyssGSEA.csv")
+genesets_list <- readRDS("genesets_list.rds")
 
 matrix_dados <- dados_app$expression_matrix
 
 meta_limpo <- dados_app$col_meta %>%
   rename(region = structure_mapped) %>%
   filter(!is.na(region), !is.na(broad_age)) %>%
-  select(column_num, region, broad_age)
+  select(column_num, region, broad_age, macro_region)
 
 tabela_base_ontologias <- tabela_final_ssgsea %>%
   mutate(Amostra = as.numeric(Amostra)) %>%
@@ -89,26 +89,37 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
 #* @param gene Nome do gene selecionado no front-end
 #* @serializer svg list(width = 8, height = 4)
 #* @get /plot_brain
-function(gene = "SOX10") {
+function(gene = "SOX10", escala = "micro") {
   if (!(gene %in% rownames(matrix_dados))) stop("Erro: Gene não encontrado.")
 
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
   matrix_dados <- as.matrix(dados_app$expression_matrix)
 
-  dados_gene_plot <- data.frame(
+  dados_base <- data.frame(
     Amostra = as.numeric(colnames(matrix_dados)),
     Expressao = as.numeric(matrix_dados[gene, ])
   ) %>%
     left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
     rename(region = structure_mapped) %>%
     filter(!is.na(region), !is.na(broad_age)) %>%
-    mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
+    mutate(broad_age = factor(broad_age, levels = ordem_idades))
+
+  if(escala == "macro"){
+    dados_gene_plot <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      mutate(Expressao_Media = mean(Expressao, na.rm = TRUE)) %>%
+      ungroup() %>%
+      distinct(broad_age, region, Expressao_Media)
+  } else {
+    dados_gene_plot <- dados_base %>%
     group_by(broad_age, region) %>%
     summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
+  }
 
-  escala <- scale_fill_gradient(low = "blue", high = "orange", name = "Log2 Expr", na.value = "darkgray")
+  escala_cores <- scale_fill_gradient(low = "blue", high = "orange", name = "Log2 Expr", na.value = "darkgray")
   
-  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
+  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala_cores)
   print(plots_brain)
 }
 
@@ -116,17 +127,28 @@ function(gene = "SOX10") {
 #* @param geneset A ontologia selecionada
 #* @serializer svg list(width = 8, height = 4)
 #* @get /plot_ontology
-function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS") {
+function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
 
-  dados_prontos <- tabela_base_ontologias %>%
+  dados_base <- tabela_base_ontologias %>%
     filter(GeneSet == geneset) %>%
     filter(!is.na(broad_age)) %>%
-    mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
+    mutate(broad_age = factor(broad_age, levels = ordem_idades))
+
+  if (nrow(dados_base) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
+
+  if(escala == "macro") {
+    dados_prontos <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
+      ungroup() %>%
+      distinct(broad_age, region, Score_Medio_ssGSEA)
+  } else {
+    dados_prontos <- dados_base %>%
     group_by(broad_age, region) %>%
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-
-  if (nrow(dados_prontos) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
+  }
 
   escala <- scale_fill_viridis_c(option = "viridis", name = "ssGSEA Score", na.value = "darkgray")
   
@@ -138,7 +160,7 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS") {
 #* @param gene_string Uma string de genes
 #* @serializer svg list(width = 8, height = 4)
 #* @post /plot_genelist
-function(gene_string = "") {
+function(gene_string = "", escala = "micro") {
   genes_brutos <- unlist(strsplit(gene_string, split = "[[:space:],]+"))
   genes_limpos <- trimws(genes_brutos)
   genes_limpos <- genes_limpos[genes_limpos != ""]
@@ -148,12 +170,6 @@ function(gene_string = "") {
 
   if (length(genes_validos) == 0) stop("Erro: Nenhum dos genes fornecidos foi encontrado na base de dados.")
 
-  texto_aviso <- NULL
-  if (length(genes_invalidos) > 0) {
-    exemplo <- paste(head(genes_invalidos, 5), collapse = ", ")
-    sufixo <- ifelse(length(genes_invalidos) > 5, "...", "")
-    texto_aviso <- paste("⚠️ Aviso:", length(genes_invalidos), "gene(s) ignorado(s) (ex:", exemplo, sufixo, ")")
-  }
 
   ssgsea_parametros <- GSVA::ssgseaParam(
     exprData = as.matrix(matrix_dados),
@@ -163,19 +179,30 @@ function(gene_string = "") {
 
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
 
-  dados_prontos <- data.frame(
+  dados_base <- data.frame(
     column_num = as.numeric(colnames(ssgsea_resultado)),
     Score_ssGSEA = as.numeric(ssgsea_resultado["UserSet", ])
   ) %>%
     inner_join(meta_limpo, by = "column_num") %>%
     filter(!is.na(broad_age)) %>%
-    mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
+    mutate(broad_age = factor(broad_age, levels = ordem_idades)) 
+
+  if(escala == "macro"){
+    dados_prontos <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
+      ungroup() %>%
+      distinct(broad_age, region, Score_Medio_ssGSEA)
+  } else {
+    dados_prontos <- dados_base %>%
     group_by(broad_age, region) %>%
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+  }
 
   escala <- scale_fill_viridis_c(option = "magma", name = "Custom ssGSEA", na.value = "darkgray")
   
-  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala, caption_text = texto_aviso)
+  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
 }
 
@@ -183,37 +210,68 @@ function(gene_string = "") {
 #* @param gene Nome do gene
 #* @serializer csv
 #* @get /data_brain
-function(gene = "SOX10") {
+function(gene = "SOX10", escala = "micro") {
+  
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
-  dados <- data.frame(column_num = as.numeric(colnames(matrix_dados)), Expressao = as.numeric(matrix_dados[gene, ])) %>%
+  
+  dados_base <- data.frame(
+    column_num = as.numeric(colnames(matrix_dados)), 
+    Expressao = as.numeric(matrix_dados[gene, ])
+  ) %>%
     inner_join(meta_limpo, by = "column_num") %>%
     filter(!is.na(broad_age)) %>%
-    mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
-    group_by(broad_age, region) %>%
-    summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
-  return(dados)
+    mutate(broad_age = factor(broad_age, levels = ordem_idades))
+    
+  if (escala == "macro") {
+    dados_finais <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
+  } else {
+    dados_finais <- dados_base %>%
+      group_by(broad_age, region) %>%
+      summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
+  }
+
+  return(dados_finais)
 }
 
 #* Baixar dados da Ontologia
 #* @param geneset A ontologia
 #* @serializer csv
 #* @get /data_ontology
-function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS") {
+function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
-  dados <- tabela_base_ontologias %>%
+  dados_base <- tabela_base_ontologias %>%
     filter(GeneSet == geneset) %>%
     filter(!is.na(broad_age)) %>%
     mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
     group_by(broad_age, region) %>%
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-  return(dados)
+
+  if (nrow(dados_base) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
+
+  if(escala == "macro") {
+    dados_prontos <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
+      ungroup() %>%
+      distinct(broad_age, region, Score_Medio_ssGSEA)
+  } else {
+    dados_prontos <- dados_base %>%
+    group_by(broad_age, region) %>%
+    summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+  }
+
+  return(dados_prontos)
 }
 
 #* Baixar dados da Lista Customizada
 #* @param gene_string
 #* @serializer csv
 #* @post /data_genelist
-function(gene_string = "") {
+function(gene_string = "", escala = "micro") {
   genes_brutos <- unlist(strsplit(gene_string, split = "[[:space:],]+"))
   genes_limpos <- trimws(genes_brutos)
   genes_validos <- intersect(genes_limpos[genes_limpos != ""], rownames(matrix_dados))
@@ -225,11 +283,56 @@ function(gene_string = "") {
   ssgsea_resultado <- GSVA::gsva(ssgsea_parametros, verbose = FALSE)
 
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
-  dados <- data.frame(column_num = as.numeric(colnames(ssgsea_resultado)), Score_ssGSEA = as.numeric(ssgsea_resultado["UserSet", ])) %>%
+dados_base <- data.frame(
+    column_num = as.numeric(colnames(ssgsea_resultado)),
+    Score_ssGSEA = as.numeric(ssgsea_resultado["UserSet", ])
+  ) %>%
     inner_join(meta_limpo, by = "column_num") %>%
     filter(!is.na(broad_age)) %>%
-    mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
+    mutate(broad_age = factor(broad_age, levels = ordem_idades)) 
+
+  if(escala == "macro"){
+    dados_prontos <- dados_base %>%
+      filter(!is.na(macro_region)) %>%
+      group_by(broad_age, macro_region) %>%
+      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
+      ungroup() %>%
+      distinct(broad_age, region, Score_Medio_ssGSEA)
+  } else {
+    dados_prontos <- dados_base %>%
     group_by(broad_age, region) %>%
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-  return(dados)
+  }
+  return(dados_prontos)
+}
+
+#* Verifica quais genes da lista existem no banco de dados
+#* @param gene_string
+#* @post /validate_genelist
+function(gene_string = "") {
+  genes_brutos <- unlist(strsplit(gene_string, split = "[[:space:],]+"))
+  genes_limpos <- trimws(genes_brutos)
+  genes_limpos <- genes_limpos[genes_limpos != ""]
+
+  genes_validos <- intersect(genes_limpos, rownames(matrix_dados))
+  genes_invalidos <- setdiff(genes_limpos, rownames(matrix_dados))
+
+  return(list(
+    validos = genes_validos,
+    invalidos = genes_invalidos
+  ))
+}
+
+#* Retorna os genes da ontologia selecionada
+#* @param geneset Nome da ontologia
+#* @get /genes_da_via
+function(geneset = "") {
+  if (geneset == "" || is.null(genesets_list[[geneset]])) {
+    return(list(genes = character(0)))
+  }
+  
+  genes_da_via <- genesets_list[[geneset]]
+  genes_presentes <- intersect(genes_da_via, rownames(matrix_dados))
+  
+  return(list(genes = as.character(genes_presentes)))
 }
