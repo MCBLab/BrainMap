@@ -46,7 +46,9 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
     geom_brain(
       atlas = ggseg::dk(),
       position = position_brain(c("right lateral")),
-      mapping = aes(fill = .data[[fill_var]])
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
     ) +
     fill_scale +
     facet_wrap(~broad_age, ncol = 5) +
@@ -64,7 +66,31 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
     geom_brain(
       atlas = ggseg::dk(),
       position = position_brain(c("right medial")),
-      mapping = aes(fill = .data[[fill_var]])
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
+    ) +
+    fill_scale +
+    facet_wrap(~broad_age, ncol = 5) +
+    labs(caption = caption_text) +
+    theme_void() +
+    theme(
+      strip.text = element_blank(),
+      strip.background = element_blank(),
+      legend.position = "none",
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
+      legend.key.height = unit(2, "cm"),
+      plot.background = element_rect(fill = "white", colour = NA)
+    )
+
+    p_sagittal <- data %>%
+    ggplot() +
+    geom_brain(
+      atlas = ggseg::aseg(),
+      position = position_brain(c("sagittal")),
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
     ) +
     fill_scale +
     facet_wrap(~broad_age, ncol = 5) +
@@ -74,12 +100,13 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       strip.text = element_blank(),
       strip.background = element_blank(),
       legend.position = "bottom",
-      plot.margin = margin(t = 0, r = 5, b = 10, l = 5),
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
       plot.background = element_rect(fill = "white", colour = NA),
       plot.caption = element_text(color = "firebrick", face = "bold", size = 11, hjust = 0.5, margin = margin(t = 15))
     )
 
-  plot_grid(p_lateral, p_medial, nrow = 2, align = "v", rel_heights = c(1, 1))
+
+  plot_grid(p_lateral, p_medial, p_sagittal, nrow = 3, align = "v", rel_heights = c(1, 0.90, 1.50))
 }
 
 #* Retorna o plot do cérebro com a expressão do gene selecionado
@@ -114,7 +141,7 @@ function(gene = "SOX10", escala = "micro") {
     summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
   }
 
-  escala_cores <- scale_fill_gradient(low = "blue", high = "orange", name = "Log2 Expr", na.value = "darkgray")
+  escala_cores <- scale_fill_viridis_c(option = "magma", name = "Log2 Expr", na.value = "darkgray")
   
   plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala_cores)
   print(plots_brain)
@@ -147,7 +174,7 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
   }
 
-  escala <- scale_fill_viridis_c(option = "viridis", name = "ssGSEA Score", na.value = "darkgray")
+  escala <- scale_fill_viridis_c(option = "magma", name = "ssGSEA Score", na.value = "darkgray")
   
   p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)

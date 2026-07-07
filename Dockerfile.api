@@ -28,7 +28,7 @@ ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
 
 # 3. Instalando library do R
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages(c('plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), Ncpus = 1)"
+    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), Ncpus = 1)"
 
 # 4. Instalando pacotes do Bioconductor (GSVA)
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
@@ -36,8 +36,8 @@ RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
     BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)"
 
 # 5. Instalando o ggseg mais recente do r-universe
-RUN R -e "options(repos = c(ggsegverse = 'https://ggsegverse.r-universe.dev', CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages('ggseg', Ncpus = 1)"
+RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"
+RUN R -e "devtools::install_github('ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never')"
     
 # Create directory for the API
 RUN mkdir -p /api

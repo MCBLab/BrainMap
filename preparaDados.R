@@ -62,7 +62,26 @@ input_values <- c(
   "posterior cingulate",
   "precuneus",
   "rostral anterior cingulate",
-  "frontal pole"
+  "frontal pole",
+  "Brain Stem",
+  "cc anterior",
+  "cc central",
+  "cc mid anterior",
+  "cc mid posterior",
+  "cc posterior",
+  "Cerebellum",
+  "choroid plexus",
+  "Thalamus",
+  "Thalamus Proper",
+  "ventraldc",
+  "Optic Chiasm",
+  "accumbens area",
+  "Amygdala",
+  "Caudate",
+  "Hippocampus",
+  "Pallidum",
+  "Putamen",
+  "vessel"
 )
 
 output_values <- c(
@@ -101,7 +120,26 @@ output_values <- c(
   "mediodorsal nucleus of thalamus",
   "parietal neocortex",
   "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "frontal pole"
+  "frontal pole",
+  NA,                                       
+  NA,                                   
+  NA,                                        
+  NA,                                       
+  NA,                                        
+  NA,                                        
+  "cerebellum",                              
+  NA,                                        
+  "dorsal thalamus",                          
+  "mediodorsal nucleus of thalamus",          
+  NA,                                        
+  NA,                                         
+  "striatum",                                
+  "amygdaloid complex",                       
+  "striatum",                                 
+  "hippocampus (hippocampal formation)",     
+  NA,                                        
+  "striatum",                                 
+  NA                                          
 )
 
 output_values_macro <- c(
@@ -140,7 +178,26 @@ output_values_macro <- c(
   "lobo frontal",
   "lobo parietal",
   "lobo frontal",
-  "lobo frontal"
+  "lobo frontal",
+  NA,                                        
+  NA,                                       
+  NA,                                        
+  NA,                                        
+  NA,                                        
+  NA,                                       
+  "cerebelo", 
+  NA,                                        
+  "subcortical",                            
+  "subcortical",                            
+  NA,                                        
+  NA,                                        
+  "subcortical",                             
+  "lobo temporal",                           
+  "subcortical",                           
+  "lobo temporal",                            
+  NA,                                         
+  "subcortical",                            
+  NA
   )
 
 mapping_df <- data.frame(
