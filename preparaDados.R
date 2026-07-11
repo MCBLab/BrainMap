@@ -7,11 +7,12 @@ library(GSVA)
 library(readr)
 
 #Carregando matrizes de dados do BrainSpan
-rows <- vroom("genes_matrix_csv/rows_metadata.csv")
-columns <- vroom("genes_matrix_csv/columns_metadata.csv")
+rows <- vroom("rows_metadata.csv")
+columns <- vroom("columns_metadata.csv")
+mapeamento_completo <- vroom("mapeamento_regioes.csv")
 
 counts_raw <- vroom(
-  "genes_matrix_csv/expression_matrix.csv",
+  "expression_matrix.csv",
   col_names = FALSE
 ) %>%
   dplyr::select(-1)
@@ -25,192 +26,13 @@ matriz_expressao <- matriz_expressao[genes_unicos, ]
 
 matriz_final <- log2(matriz_expressao + 1)
 
-# Mapping dataframes
-input_values <- c(
-  NA,
-  "bankssts",
-  "caudal middle frontal",
-  "fusiform",
-  "inferior parietal",
-  "inferior temporal",
-  "lateral occipital",
-  "lateral orbitofrontal",
-  "middle temporal",
-  "pars opercularis",
-  "pars orbitalis",
-  "pars triangularis",
-  "postcentral",
-  "precentral",
-  "rostral middle frontal",
-  "superior frontal",
-  "superior parietal",
-  "superior temporal",
-  "supramarginal",
-  "temporal pole",
-  "transverse temporal",
-  "insula",
-  "caudal anterior cingulate",
-  "corpus callosum",
-  "cuneus",
-  "entorhinal",
-  "isthmus cingulate",
-  "lingual",
-  "medial orbitofrontal",
-  "parahippocampal",
-  "paracentral",
-  "pericalcarine",
-  "posterior cingulate",
-  "precuneus",
-  "rostral anterior cingulate",
-  "frontal pole",
-  "Brain Stem",
-  "cc anterior",
-  "cc central",
-  "cc mid anterior",
-  "cc mid posterior",
-  "cc posterior",
-  "Cerebellum",
-  "choroid plexus",
-  "Thalamus",
-  "Thalamus Proper",
-  "ventraldc",
-  "Optic Chiasm",
-  "accumbens area",
-  "Amygdala",
-  "Caudate",
-  "Hippocampus",
-  "Pallidum",
-  "Putamen",
-  "vessel"
-)
+mapping_df <- mapeamento_completo %>%
+  select(region, structure_name) %>%
+  as.data.frame()
 
-output_values <- c(
-  NA,
-  "occipital neocortex",
-  "dorsolateral prefrontal cortex",
-  "inferolateral temporal cortex (area TEv, area 20)",
-  "posteroventral (inferior) parietal cortex",
-  "temporal neocortex",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "posterior (caudal) superior temporal cortex (area 22c)",
-  "ventrolateral prefrontal cortex",
-  "orbital frontal cortex",
-  "ventrolateral prefrontal cortex",
-  "primary somatosensory cortex (area S1, areas 3,1,2)",
-  "primary motor cortex (area M1, area 4)",
-  "dorsolateral prefrontal cortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "parietal neocortex",
-  "temporal neocortex",
-  "posteroventral (inferior) parietal cortex",
-  "amygdaloid complex",
-  "primary auditory cortex (core)",
-  "striatum",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "cerebellum",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "hippocampus (hippocampal formation)",
-  "mediodorsal nucleus of thalamus",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "hippocampus (hippocampal formation)",
-  "primary motor-sensory cortex (samples)",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "mediodorsal nucleus of thalamus",
-  "parietal neocortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "frontal pole",
-  NA,                                       
-  NA,                                   
-  NA,                                        
-  NA,                                       
-  NA,                                        
-  NA,                                        
-  "cerebellum",                              
-  NA,                                        
-  "dorsal thalamus",                          
-  "mediodorsal nucleus of thalamus",          
-  NA,                                        
-  NA,                                         
-  "striatum",                                
-  "amygdaloid complex",                       
-  "striatum",                                 
-  "hippocampus (hippocampal formation)",     
-  NA,                                        
-  "striatum",                                 
-  NA                                          
-)
-
-output_values_macro <- c(
-  NA, 
-  "lobo temporal", 
-  "lobo frontal", 
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo occipital",
-  "lobo frontal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo temporal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo occipital",
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo occipital",
-  "lobo frontal",
-  "lobo parietal",
-  "lobo frontal",
-  "lobo frontal",
-  NA,                                        
-  NA,                                       
-  NA,                                        
-  NA,                                        
-  NA,                                        
-  NA,                                       
-  "cerebelo", 
-  NA,                                        
-  "subcortical",                            
-  "subcortical",                            
-  NA,                                        
-  NA,                                        
-  "subcortical",                             
-  "lobo temporal",                           
-  "subcortical",                           
-  "lobo temporal",                            
-  NA,                                         
-  "subcortical",                            
-  NA
-  )
-
-mapping_df <- data.frame(
-  region = input_values,
-  structure_name = output_values,
-  stringsAsFactors = FALSE
-)
-
-mapping_macro <- data.frame(
-  region = input_values,
-  macro_region = output_values_macro,
-  stringsAsFactors = FALSE
-)
+mapping_macro <- mapeamento_completo %>%
+  select(region, macro_region = macro_regions) %>%
+  as.data.frame()
 
 # Mapeamento de idades
 ages <- c(
