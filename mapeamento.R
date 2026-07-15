@@ -105,7 +105,7 @@ output_values <- c(
   "cerebellum",                              
   NA,                                        
   "dorsal thalamus",                          
-  "mediodorsal nucleus of thalamus",          
+  "dorsal thalamus",          
   NA,                                        
   NA,                                         
   "striatum",                                

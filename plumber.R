@@ -99,19 +99,40 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
     theme(
       strip.text = element_blank(),
       strip.background = element_blank(),
+      legend.position = "none",
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
+      legend.key.height = unit(2, "cm"),
+      plot.background = element_rect(fill = "white", colour = NA)
+    )
+
+    p_coronal <- data %>%
+    ggplot() +
+    geom_brain(
+      atlas = ggseg::aseg(),
+      position = position_brain(c("coronal_1")),
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
+    ) +
+    fill_scale +
+    facet_wrap(~broad_age, ncol = 5) +
+    labs(caption = caption_text) +
+    theme_void() +
+    theme(
+      strip.text = element_blank(),
+      strip.background = element_blank(),
       legend.position = "bottom",
       plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
       plot.background = element_rect(fill = "white", colour = NA),
       plot.caption = element_text(color = "firebrick", face = "bold", size = 11, hjust = 0.5, margin = margin(t = 15))
     )
 
-
-  plot_grid(p_lateral, p_medial, p_sagittal, nrow = 3, align = "v", rel_heights = c(1, 0.90, 1.50))
+  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.90, 1.10, 1.40))
 }
 
 #* Retorna o plot do cérebro com a expressão do gene selecionado
 #* @param gene Nome do gene selecionado no front-end
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @get /plot_brain
 function(gene = "SOX10", escala = "micro") {
   if (!(gene %in% rownames(matrix_dados))) stop("Erro: Gene não encontrado.")
@@ -149,7 +170,7 @@ function(gene = "SOX10", escala = "micro") {
 
 #* Plota o mapa cerebral baseado no Score ssGSEA de uma ONTOLOGIA
 #* @param geneset A ontologia selecionada
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @get /plot_ontology
 function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
@@ -182,7 +203,7 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
 
 #* Plota o mapa cerebral baseado no ssGSEA de uma lista CUSTOMIZADA de genes
 #* @param gene_string Uma string de genes
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @post /plot_genelist
 function(gene_string = "", escala = "micro") {
   genes_brutos <- unlist(strsplit(gene_string, split = "[[:space:],]+"))
@@ -359,4 +380,42 @@ function(geneset = "") {
   genes_presentes <- intersect(genes_da_via, rownames(matrix_dados))
   
   return(list(genes = as.character(genes_presentes)))
+}
+
+#* Retorna o mapa de referência de uma aba específica
+#* @param view Qual corte mostrar (lateral, medial, sagittal, coronal)
+#* @serializer svg list(width = 8, height = 6)
+#* @get /plot_reference
+function(view = "lateral") {
+  
+  mapa_referencia <- dados_app$mapping_info$region_to_structure %>%
+    filter(!is.na(structure_name))
+  
+  todas_areas <- sort(unique(mapa_referencia$structure_name))
+  
+  escala_inteligente <- scale_fill_discrete(limits = todas_areas, drop = TRUE, name = "")
+
+  if (view == "lateral") {
+    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Lateral")
+  } else if (view == "medial") {
+    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Medial")
+  } else if (view == "sagittal") {
+    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Sagital)")
+  } else if (view == "coronal") {
+    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Coronal)")
+  } else {
+    stop("Corte não encontrado.")
+  }
+
+  p_final <- p + 
+    escala_inteligente + 
+    theme_void() + 
+    theme(
+      legend.position = "bottom",
+      legend.text = element_text(size = 11),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+    ) +
+    guides(fill = guide_legend(ncol = 2, keywidth = 1, keyheight = 1))
+
+  print(p_final)
 }
