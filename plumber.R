@@ -4,6 +4,8 @@ library(ggplot2)
 library(ggseg)
 library(GSVA)
 library(cowplot)
+library(paletteer)
+library(PNWColors)
 
 #* @filter cors
 cors <- function(res) {
@@ -162,8 +164,9 @@ function(gene = "SOX10", escala = "micro") {
     summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
   }
 
-  escala_cores <- scale_fill_viridis_c(option = "magma", name = "Log2 Expr", na.value = "darkgray")
-  
+  escala_cores <- scale_fill_paletteer_c("scico::lajjola", name = "Log2 Expr", na.value = "darkgray")
+
+
   plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala_cores)
   print(plots_brain)
 }
@@ -393,16 +396,38 @@ function(view = "lateral") {
   
   todas_areas <- sort(unique(mapa_referencia$structure_name))
   
-  escala_inteligente <- scale_fill_discrete(limits = todas_areas, drop = TRUE, name = "")
+  mapa_referencia$structure_name <- factor(mapa_referencia$structure_name, levels = todas_areas)
+  
+  escala_inteligente <- scale_fill_discrete(drop = TRUE, name = "")
 
   if (view == "lateral") {
-    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Lateral")
+    df_dk <- as.data.frame(ggseg::dk())
+    areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "lateral"]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Lateral")
+    
   } else if (view == "medial") {
-    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Medial")
+    df_dk <- as.data.frame(ggseg::dk())
+    areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "medial"]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Medial")
+    
   } else if (view == "sagittal") {
-    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Sagital)")
+    df_aseg <- as.data.frame(ggseg::aseg())
+    areas <- df_aseg$region[grepl("sagittal", df_aseg$view, ignore.case = TRUE)]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Sagital)")
+    
   } else if (view == "coronal") {
-    p <- ggplot(mapa_referencia) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Coronal)")
+    df_aseg <- as.data.frame(ggseg::aseg())
+    areas <- df_aseg$region[grepl("coronal_1", df_aseg$view, ignore.case = TRUE)]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Coronal)")
+    
   } else {
     stop("Corte não encontrado.")
   }

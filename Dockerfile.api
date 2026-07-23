@@ -28,7 +28,7 @@ ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
 
 # 3. Instalando library do R
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), Ncpus = 1)"
+    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot', 'paletteer', 'scico', 'PNWColors'), Ncpus = 1)"
 
 # 4. Instalando pacotes do Bioconductor (GSVA)
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \

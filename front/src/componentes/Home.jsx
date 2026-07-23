@@ -592,7 +592,7 @@ export default function Home() {
                 src={`http://127.0.0.1:33857/plot_reference?view=${abaMapaRef}`}
                 alt={`Mapa ${abaMapaRef}`}
                 style={{ 
-                  maxWidth: '100%', 
+                  maxWidth: '70%', 
                   height: 'auto', 
                   display: 'inline-block' 
                 }}
