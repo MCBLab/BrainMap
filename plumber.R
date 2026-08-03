@@ -431,14 +431,14 @@ function(view = "lateral", escala = "micro") {
     areas <- df_aseg$region[grepl("sagittal", df_aseg$view, ignore.case = TRUE)]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(.data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Sagital) -", ifelse(escala == "macro", "Macro", "Micro")))
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Sagital) -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else if (view == "coronal") {
     df_aseg <- as.data.frame(ggseg::aseg())
     areas <- df_aseg$region[grepl("coronal_1", df_aseg$view, ignore.case = TRUE)]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(.data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Coronal) -", ifelse(escala == "macro", "Macro", "Micro")))
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Coronal) -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else {
     stop("Corte não encontrado.")
