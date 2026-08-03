@@ -4,8 +4,6 @@ library(ggplot2)
 library(ggseg)
 library(GSVA)
 library(cowplot)
-library(paletteer)
-library(PNWColors)
 
 #* @filter cors
 cors <- function(res) {
@@ -164,10 +162,11 @@ function(gene = "SOX10", escala = "micro") {
     summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
   }
 
-  escala_cores <- scale_fill_paletteer_c("scico::lajjola", name = "Log2 Expr", na.value = "darkgray")
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    name = "Log2 Expr", na.value = "darkgray")  
 
-
-  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala_cores)
+  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
   print(plots_brain)
 }
 
@@ -198,7 +197,9 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
   }
 
-  escala <- scale_fill_viridis_c(option = "magma", name = "ssGSEA Score", na.value = "darkgray")
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    name = "ssGSEA Score", na.value = "darkgray")
   
   p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
@@ -248,8 +249,10 @@ function(gene_string = "", escala = "micro") {
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
   }
 
-  escala <- scale_fill_viridis_c(option = "magma", name = "Custom ssGSEA", na.value = "darkgray")
-  
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    name = "Custom ssGSEA", na.value = "darkgray")
+
   p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
 }
@@ -387,53 +390,63 @@ function(geneset = "") {
 
 #* Retorna o mapa de referência de uma aba específica
 #* @param view Qual corte mostrar (lateral, medial, sagittal, coronal)
-#* @serializer svg list(width = 8, height = 6)
+#* @param escala Qual nível de detalhe (micro, macro)
+#* @serializer svg list(width = 9, height = 7)
 #* @get /plot_reference
-function(view = "lateral") {
+function(view = "lateral", escala = "micro") {
   
-  mapa_referencia <- dados_app$mapping_info$region_to_structure %>%
-    filter(!is.na(structure_name))
+  if (escala == "macro") {
+    mapa_referencia <- dados_app$mapping_info$region_to_macro_structure
+    coluna <- "macro_region"
+  } else {
+    mapa_referencia <- dados_app$mapping_info$region_to_structure
+    coluna <- "structure_name"
+  }
+
+  mapa_referencia <- mapa_referencia %>%
+    filter(!is.na(.data[[coluna]]))
   
-  todas_areas <- sort(unique(mapa_referencia$structure_name))
+  todas_areas <- sort(unique(mapa_referencia[[coluna]]))
   
-  mapa_referencia$structure_name <- factor(mapa_referencia$structure_name, levels = todas_areas)
+  mapa_referencia[[coluna]] <- factor(mapa_referencia[[coluna]], levels = todas_areas)
   
-  escala_inteligente <- scale_fill_discrete(drop = TRUE, name = "")
+  escala_sem_NA <- scale_fill_discrete(drop = TRUE, na.translate = FALSE, name = "")
 
   if (view == "lateral") {
     df_dk <- as.data.frame(ggseg::dk())
     areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "lateral"]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Lateral")
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Córtex Lateral -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else if (view == "medial") {
     df_dk <- as.data.frame(ggseg::dk())
     areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "medial"]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Córtex Medial")
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Córtex Medial -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else if (view == "sagittal") {
     df_aseg <- as.data.frame(ggseg::aseg())
     areas <- df_aseg$region[grepl("sagittal", df_aseg$view, ignore.case = TRUE)]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Sagital)")
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(.data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Sagital) -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else if (view == "coronal") {
     df_aseg <- as.data.frame(ggseg::aseg())
     areas <- df_aseg$region[grepl("coronal_1", df_aseg$view, ignore.case = TRUE)]
     dados_plot <- mapa_referencia %>% filter(region %in% areas)
     
-    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = structure_name), color = "black", size = 0.3) + ggtitle("Subcortical (Coronal)")
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(.data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Coronal) -", ifelse(escala == "macro", "Macro", "Micro")))
     
   } else {
     stop("Corte não encontrado.")
   }
 
+  # 4. Finalização do Plot
   p_final <- p + 
-    escala_inteligente + 
+    escala_sem_NA + 
     theme_void() + 
     theme(
       legend.position = "bottom",

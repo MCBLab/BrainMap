@@ -25,6 +25,7 @@ export default function Home() {
 
   const [modalAberto, setModalAberto] = useState(false);
   const [abaMapaRef, setAbaMapaRef] = useState('lateral');
+  const [escalaMapaRef, setEscalaMapaRef] = useState('micro');
 
   // Buscando lista de Genes ou Ontologias no R (com Retry automático)
   useEffect(() => {
@@ -394,7 +395,6 @@ export default function Home() {
         {/* COLUNA DIREITA (Visualização e Botões) */}
         <div className="lg:col-span-8 flex flex-col gap-4">
           
-            {/* 1. COLE O TRECHO DO AVISO EXATAMENTE AQUI (NO TOPO DA COLUNA) */}
         {genesInvalidos.length > 0 && (
           <div className="bg-[#fff8e6] border border-[#f0dca5] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
             <div className="flex justify-between items-center">
@@ -467,9 +467,7 @@ export default function Home() {
 
       </div>
 
-      {/* ========================================================= */}
-      {/* BOTÃO FLUTUANTE                                           */}
-      {/* ========================================================= */}
+      {/* BOTÃO FLUTUANTE */}
       <button
         onClick={() => setModalAberto(true)}
         style={{
@@ -499,9 +497,7 @@ export default function Home() {
         ?
       </button>
 
-      {/* ========================================================= */}
-      {/* MODAL DE REFERÊNCIA (ANTI-BUG DE LAYOUT)                  */}
-      {/* ========================================================= */}
+      {/* MODAL DE REFERÊNCIA */}
       {modalAberto && (
         <div style={{
           position: 'fixed',
@@ -541,6 +537,35 @@ export default function Home() {
               Reference Map (Regions)
             </h2>
 
+              {/*TROCA DE VISUALIZAÇÃO*/}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              marginBottom: '20px' 
+            }}>
+              {['micro', 'macro'].map((nivel) => (
+                <button
+                  key={nivel}
+                  onClick={() => setEscalaMapaRef(nivel)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '20px',
+                    border: '2px solid #58614c',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    backgroundColor: escalaMapaRef === nivel ? '#58614c' : 'white',
+                    color: escalaMapaRef === nivel ? 'white' : '#58614c',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  {nivel === 'micro' ? 'Microregions' : 'Macroregions'}
+                </button>
+              ))}
+            </div>
+            
             {/* MENU DE ABAS */}
             <div style={{ 
               display: 'block', 
@@ -589,7 +614,8 @@ export default function Home() {
               textAlign: 'center' 
             }}>
               <img
-                src={`http://127.0.0.1:33857/plot_reference?view=${abaMapaRef}`}
+                key={`${abaMapaRef}-${escalaMapaRef}`}
+                src={`http://127.0.0.1:33857/plot_reference?view=${abaMapaRef}&escala=${escalaMapaRef}`}
                 alt={`Mapa ${abaMapaRef}`}
                 style={{ 
                   maxWidth: '70%', 
