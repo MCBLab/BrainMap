@@ -26,6 +26,7 @@ tabela_base_ontologias <- tabela_final_ssgsea %>%
   mutate(Amostra = as.numeric(Amostra)) %>%
   inner_join(meta_limpo, by = c("Amostra" = "column_num"), relationship = "many-to-many")
 
+# 2. LISTAS OTIMIZADAS (À prova de falhas)
 setgene <- rownames(matrix_dados)
 setontologies <- unique(tabela_final_ssgsea$GeneSet)
 
@@ -129,6 +130,8 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
 
   plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.90, 1.10, 1.40))
 }
+
+# 3. ENDPOINTS DE PLOTAGEM (SINTAXE OFICIAL MODERNA DO GGSEG)
 
 #* Retorna o plot do cérebro com a expressão do gene selecionado
 #* @param gene Nome do gene selecionado no front-end
