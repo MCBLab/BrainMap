@@ -7,12 +7,12 @@ library(GSVA)
 library(readr)
 
 #Carregando matrizes de dados do BrainSpan
-rows <- vroom("rows_metadata.csv")
-columns <- vroom("columns_metadata.csv")
+rows <- vroom("genes_matrix_csv/rows_metadata.csv")
+columns <- vroom("genes_matrix_csv/columns_metadata.csv")
 mapeamento_completo <- vroom("mapeamento_regioes.csv")
 
 counts_raw <- vroom(
-  "expression_matrix.csv",
+  "genes_matrix_csv/expression_matrix.csv",
   col_names = FALSE
 ) %>%
   dplyr::select(-1)
@@ -108,6 +108,8 @@ columns_enriquecidas <- columns_renomeado %>%
 mapeamento_rapido <- columns_enriquecidas %>%
   select(column_num, broad_age, structure_mapped, macro_region)
 
+message("==> Montando objeto final dados_app (expression_matrix + col_meta + mapping_info)...")
+
 # Salvar os dados otimizados com todas as informações de mapeamento
 dados_app <- list(
   expression_matrix = matriz_final,
@@ -120,6 +122,8 @@ dados_app <- list(
     quick_lookup = mapeamento_rapido
   )
 )
+
+message("==> Baixando gene sets do MSigDB (H, BIOCARTA, KEGG_LEGACY, REACTOME, C5)...")
 
 #Criando dados para as Ontologias
 matrix_dados <- as.matrix(dados_app$expression_matrix)
@@ -134,6 +138,8 @@ all_genesets_df <- bind_rows(h_df, biocarta_df, kegg_df, reactome_df, geneont_df
 
 genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
 
+message("==> Rodando ssGSEA")
+
 # ssGSEA Score
 ssgsea_param <- ssgseaParam(exprData = matrix_dados, geneSets = genesets_list)
 ssgsea_results <- gsva(ssgsea_param)
@@ -146,6 +152,7 @@ tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
     values_to = "Score_ssGSEA"
   )
 
+message("==> Salvando arquivos de saída (dados_otimizados.rds, genesets_list.rds, ontologyssGSEA.csv)...")
 
 saveRDS(dados_app, "dados_otimizados.rds")
 saveRDS(genesets_list, "genesets_list.rds")

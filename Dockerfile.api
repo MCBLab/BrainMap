@@ -18,8 +18,6 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libgeos-dev \
     libsodium-dev \
-    libfontconfig1-dev \
-    libcairo2-dev \
     cmake \
     libabsl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -28,27 +26,32 @@ ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
 
 # 3. Instalando library do R
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot', 'paletteer', 'scico', 'PNWColors'), Ncpus = 1)"
+    install.packages(c('devtools', 'plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'svglite'), Ncpus = 1); \
+    remotes::install_version('msigdbr', version = '26.1.0', upgrade = 'never'); \
+    remotes::install_version('cowplot', version = '1.2.0', upgrade = 'never'); \
+    remotes::install_version('vroom', version = '1.7.0', upgrade = 'never')"
 
 # 4. Instalando pacotes do Bioconductor (GSVA)
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
     if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
     BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)"
 
-# 5. Instalando o ggseg mais recente do r-universe
+# 5. Instalando o ggseg fixado na versão 2.1.1
 RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"
 RUN R -e "devtools::install_github('ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never')"
-    
+
 # Create directory for the API
 RUN mkdir -p /api
 
-# Copy necessary files
-COPY plumber.R /api/
-COPY dados_otimizados.rds /api/
-COPY ontologyssGSEA.csv /api/
-COPY genesets_list.rds /api/
-
 WORKDIR /api
+
+COPY genes_matrix_csv/ /api/genes_matrix_csv/
+COPY mapeamento.R /api/
+COPY preparaDados.R /api/
+
+RUN Rscript mapeamento.R && Rscript preparaDados.R
+
+COPY plumber.R /api/
 
 # The port expected by the front-end as per plumber.R
 EXPOSE 33857
