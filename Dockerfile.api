@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:4.3.2
+FROM rocker/tidyverse:4.5.1
 
 # Install system dependencies required for ggseg and plumber
 RUN apt-get update && apt-get install -y \
@@ -18,23 +18,26 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libgeos-dev \
     libsodium-dev \
+    libmagick++-dev \
     cmake \
     libabsl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
+ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/noble/latest"
 
 # 3. Instalando library do R
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages(c('devtools', 'plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'svglite'), Ncpus = 1); \
-    remotes::install_version('msigdbr', version = '26.1.0', upgrade = 'never'); \
-    remotes::install_version('cowplot', version = '1.2.0', upgrade = 'never'); \
-    remotes::install_version('vroom', version = '1.7.0', upgrade = 'never')"
+    install.packages(c('devtools', 'plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', \
+    'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'svglite', \
+    'vroom', 'msigdbr', 'cowplot'), Ncpus = 1);"
 
 # 4. Instalando pacotes do Bioconductor (GSVA)
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
     if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
-    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)"
+    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)" \
+    && R -e "stopifnot(requireNamespace('GSVA', quietly = TRUE), \
+                        requireNamespace('Biobase', quietly = TRUE), \
+                        requireNamespace('GSEABase', quietly = TRUE))"
 
 # 5. Instalando o ggseg fixado na versão 2.1.1
 RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"

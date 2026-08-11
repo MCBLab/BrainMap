@@ -128,7 +128,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       plot.caption = element_text(color = "firebrick", face = "bold", size = 11, hjust = 0.5, margin = margin(t = 15))
     )
 
-  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.90, 1.10, 1.40))
+  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.89, 1.10, 1.120))  #1, 0.90, 1.10, 1.40
 }
 
 # 3. ENDPOINTS DE PLOTAGEM (SINTAXE OFICIAL MODERNA DO GGSEG)
