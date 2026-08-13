@@ -40,7 +40,7 @@ RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
                         requireNamespace('GSEABase', quietly = TRUE))"
 
 # 5. Instalando o ggseg fixado na versão 2.1.1
-RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"
+RUN R -e "devtools::install_github('ggsegverse/ggseg.formats', ref = 'v0.0.2', upgrade = 'never')"
 RUN R -e "devtools::install_github('ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never')"
 
 # Create directory for the API
@@ -49,10 +49,10 @@ RUN mkdir -p /api
 WORKDIR /api
 
 COPY genes_matrix_csv/ /api/genes_matrix_csv/
-COPY mapeamento.R /api/
+COPY mapeamento_regioes.csv /api/
 COPY preparaDados.R /api/
 
-RUN Rscript mapeamento.R && Rscript preparaDados.R
+RUN Rscript preparaDados.R
 
 COPY plumber.R /api/
 
