@@ -128,7 +128,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       plot.caption = element_text(color = "firebrick", face = "bold", size = 11, hjust = 0.5, margin = margin(t = 15))
     )
 
-  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.89, 1.10, 1.120))  #1, 0.90, 1.10, 1.40
+  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.89, 1.10, 1.4))  #1, 0.90, 1.10, 1.40
 }
 
 # 3. ENDPOINTS DE PLOTAGEM (SINTAXE OFICIAL MODERNA DO GGSEG)
@@ -150,6 +150,7 @@ function(gene = "SOX10", escala = "micro") {
     left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
     rename(region = structure_mapped) %>%
     filter(!is.na(region), !is.na(broad_age)) %>%
+    mutate(Expressao = ifelse(Expressao > 6, 6, Expressao)) %>%
     mutate(broad_age = factor(broad_age, levels = ordem_idades))
 
   if(escala == "macro"){
@@ -166,7 +167,7 @@ function(gene = "SOX10", escala = "micro") {
   }
 
   escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
-    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    values = scales::rescale(c(0, 1.5, 3, 4.5, 6)),limits = c(0, 6), 
     name = "Log2 Expr", na.value = "darkgray")  
 
   plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
