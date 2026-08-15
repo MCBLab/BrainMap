@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Select from 'react-select';
 
 export default function Home() {
-  const [abaAtual, setAbaAtual] = useState('gene');
+  const [abaAtual, setAbaAtual] = useState('genelist');
   const [escalaRegiao, setEscalaRegiao] = useState('micro');
   const [opcoes, setOpcoes] = useState([]);
   const [selecionada, setSelecionada] = useState(null);
@@ -22,6 +22,10 @@ export default function Home() {
   const [genesDaVia, setGenesDaVia] = useState([]);
   const [mostrarGenesDaVia, setMostrarGenesDaVia] = useState(false);
   const [carregandoGenesVia, setCarregandoGenesVia] = useState(false);
+
+  const [modalAberto, setModalAberto] = useState(false);
+  const [abaMapaRef, setAbaMapaRef] = useState('lateral');
+  const [escalaMapaRef, setEscalaMapaRef] = useState('micro');
 
   // Buscando lista de Genes ou Ontologias no R (com Retry automático)
   useEffect(() => {
@@ -259,7 +263,7 @@ export default function Home() {
           </div>
 
           <div className="flex bg-[#e4e9ea] p-1 rounded-lg mb-6">
-            {['gene', 'ontology', 'genelist'].map((tab) => (
+            {['genelist','gene','ontology'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => setAbaAtual(tab)}
@@ -391,7 +395,6 @@ export default function Home() {
         {/* COLUNA DIREITA (Visualização e Botões) */}
         <div className="lg:col-span-8 flex flex-col gap-4">
           
-            {/* 1. COLE O TRECHO DO AVISO EXATAMENTE AQUI (NO TOPO DA COLUNA) */}
         {genesInvalidos.length > 0 && (
           <div className="bg-[#fff8e6] border border-[#f0dca5] rounded-xl p-5 flex flex-col gap-3 shadow-sm">
             <div className="flex justify-between items-center">
@@ -463,6 +466,169 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* BOTÃO FLUTUANTE */}
+      <button
+        onClick={() => setModalAberto(true)}
+        style={{
+          position: 'fixed',
+          bottom: '30px',
+          right: '30px',
+          backgroundColor: '#58614c',
+          color: 'white',
+          border: 'none',
+          borderRadius: '50%',
+          width: '60px',
+          height: '60px',
+          fontSize: '28px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0px 4px 10px rgba(0,0,0,0.3)',
+          zIndex: 999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'transform 0.2s'
+        }}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+        title="Reference Map"
+      >
+        ?
+      </button>
+
+      {/* MODAL DE REFERÊNCIA */}
+      {modalAberto && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 999999
+        }}>
+          
+          <div style={{
+            backgroundColor: 'white',
+            padding: '30px',
+            borderRadius: '12px',
+            position: 'relative',
+            width: '90%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            display: 'block', 
+            boxShadow: '0px 15px 40px rgba(0,0,0,0.6)'
+          }}>
+            
+            {/* Botão Fechar */}
+            <button
+              onClick={() => setModalAberto(false)}
+              style={{
+                position: 'absolute', top: '15px', right: '15px', 
+                backgroundColor: '#e74c3c', color: 'white', border: 'none', 
+                borderRadius: '5px', padding: '8px 15px', cursor: 'pointer', fontWeight: 'bold'
+              }}
+            >
+              Fechar
+            </button>
+
+            {/* Título */}
+            <h2 style={{ marginTop: 0, marginBottom: '20px', color: '#58614c', fontWeight: 'bold', fontSize: '20px' }}>
+              Reference Map (Regions)
+            </h2>
+
+              {/*TROCA DE VISUALIZAÇÃO*/}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '10px', 
+              marginBottom: '20px' 
+            }}>
+              {['micro', 'macro'].map((nivel) => (
+                <button
+                  key={nivel}
+                  onClick={() => setEscalaMapaRef(nivel)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '20px',
+                    border: '2px solid #58614c',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    backgroundColor: escalaMapaRef === nivel ? '#58614c' : 'white',
+                    color: escalaMapaRef === nivel ? 'white' : '#58614c',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  {nivel === 'micro' ? 'Microregions' : 'Macroregions'}
+                </button>
+              ))}
+            </div>
+            
+            {/* MENU DE ABAS */}
+            <div style={{ 
+              display: 'block', 
+              backgroundColor: '#f3f4f6', 
+              padding: '10px', 
+              borderRadius: '8px', 
+              marginBottom: '20px',
+              textAlign: 'center' 
+            }}>
+              {[
+                { id: 'lateral', nome: 'Córtex Lateral' },
+                { id: 'medial', nome: 'Córtex Medial' },
+                { id: 'sagittal', nome: 'Subcortical (Sagital)' },
+                { id: 'coronal', nome: 'Subcortical (Coronal)' }
+              ].map((corte) => (
+                <button
+                  key={corte.id}
+                  onClick={() => setAbaMapaRef(corte.id)}
+                  style={{
+                    display: 'inline-block', 
+                    margin: '5px', 
+                    padding: '10px 16px',
+                    fontSize: '11px',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: abaMapaRef === corte.id ? '#58614c' : '#e4e9ea',
+                    color: abaMapaRef === corte.id ? 'white' : '#596061',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {corte.nome}
+                </button>
+              ))}
+            </div>
+
+            {/* ÁREA DA IMAGEM */}
+            <div style={{
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              padding: '15px',
+              textAlign: 'center' 
+            }}>
+              <img
+                key={`${abaMapaRef}-${escalaMapaRef}`}
+                src={`http://127.0.0.1:33857/plot_reference?view=${abaMapaRef}&escala=${escalaMapaRef}`}
+                alt={`Mapa ${abaMapaRef}`}
+                style={{ 
+                  maxWidth: '70%', 
+                  height: 'auto', 
+                  display: 'inline-block' 
+                }}
+              />
+            </div>
+            
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }

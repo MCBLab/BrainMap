@@ -47,7 +47,9 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
     geom_brain(
       atlas = ggseg::dk(),
       position = position_brain(c("right lateral")),
-      mapping = aes(fill = .data[[fill_var]])
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
     ) +
     fill_scale +
     facet_wrap(~broad_age, ncol = 5) +
@@ -65,7 +67,53 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
     geom_brain(
       atlas = ggseg::dk(),
       position = position_brain(c("right medial")),
-      mapping = aes(fill = .data[[fill_var]])
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
+    ) +
+    fill_scale +
+    facet_wrap(~broad_age, ncol = 5) +
+    labs(caption = caption_text) +
+    theme_void() +
+    theme(
+      strip.text = element_blank(),
+      strip.background = element_blank(),
+      legend.position = "none",
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
+      legend.key.height = unit(2, "cm"),
+      plot.background = element_rect(fill = "white", colour = NA)
+    )
+
+    p_sagittal <- data %>%
+    ggplot() +
+    geom_brain(
+      atlas = ggseg::aseg(),
+      position = position_brain(c("sagittal")),
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
+    ) +
+    fill_scale +
+    facet_wrap(~broad_age, ncol = 5) +
+    labs(caption = caption_text) +
+    theme_void() +
+    theme(
+      strip.text = element_blank(),
+      strip.background = element_blank(),
+      legend.position = "none",
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
+      legend.key.height = unit(2, "cm"),
+      plot.background = element_rect(fill = "white", colour = NA)
+    )
+
+    p_coronal <- data %>%
+    ggplot() +
+    geom_brain(
+      atlas = ggseg::aseg(),
+      position = position_brain(c("coronal_1")),
+      mapping = aes(fill = .data[[fill_var]]),
+      color = 'black',
+      size = 0.50
     ) +
     fill_scale +
     facet_wrap(~broad_age, ncol = 5) +
@@ -75,19 +123,19 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       strip.text = element_blank(),
       strip.background = element_blank(),
       legend.position = "bottom",
-      plot.margin = margin(t = 0, r = 5, b = 10, l = 5),
+      plot.margin = margin(t = 20, r = 5, b = 0, l = 5),
       plot.background = element_rect(fill = "white", colour = NA),
       plot.caption = element_text(color = "firebrick", face = "bold", size = 11, hjust = 0.5, margin = margin(t = 15))
     )
 
-  plot_grid(p_lateral, p_medial, nrow = 2, align = "v", rel_heights = c(1, 1))
+  plot_grid(p_lateral, p_medial, p_sagittal, p_coronal, nrow = 4, align = "v", rel_heights = c(1, 0.89, 1.10, 1.4))  #1, 0.90, 1.10, 1.40
 }
 
 # 3. ENDPOINTS DE PLOTAGEM (SINTAXE OFICIAL MODERNA DO GGSEG)
 
 #* Retorna o plot do cérebro com a expressão do gene selecionado
 #* @param gene Nome do gene selecionado no front-end
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @get /plot_brain
 function(gene = "SOX10", escala = "micro") {
   if (!(gene %in% rownames(matrix_dados))) stop("Erro: Gene não encontrado.")
@@ -102,6 +150,7 @@ function(gene = "SOX10", escala = "micro") {
     left_join(dados_app$col_meta, by = c("Amostra" = "column_num")) %>%
     rename(region = structure_mapped) %>%
     filter(!is.na(region), !is.na(broad_age)) %>%
+    mutate(Expressao = ifelse(Expressao > 6, 6, Expressao)) %>%
     mutate(broad_age = factor(broad_age, levels = ordem_idades))
 
   if(escala == "macro"){
@@ -117,15 +166,17 @@ function(gene = "SOX10", escala = "micro") {
     summarise(Expressao_Media = mean(Expressao, na.rm = TRUE), .groups = "drop")
   }
 
-  escala_cores <- scale_fill_gradient(low = "blue", high = "orange", name = "Log2 Expr", na.value = "darkgray")
-  
-  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala_cores)
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    values = scales::rescale(c(0, 1.5, 3, 4.5, 6)),limits = c(0, 6), 
+    name = "Log2 Expr", na.value = "darkgray")  
+
+  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
   print(plots_brain)
 }
 
 #* Plota o mapa cerebral baseado no Score ssGSEA de uma ONTOLOGIA
 #* @param geneset A ontologia selecionada
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @get /plot_ontology
 function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
@@ -150,7 +201,9 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
   }
 
-  escala <- scale_fill_viridis_c(option = "viridis", name = "ssGSEA Score", na.value = "darkgray")
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    name = "ssGSEA Score", na.value = "darkgray")
   
   p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
@@ -158,7 +211,7 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
 
 #* Plota o mapa cerebral baseado no ssGSEA de uma lista CUSTOMIZADA de genes
 #* @param gene_string Uma string de genes
-#* @serializer svg list(width = 8, height = 4)
+#* @serializer svg list(width = 11, height = 7)
 #* @post /plot_genelist
 function(gene_string = "", escala = "micro") {
   genes_brutos <- unlist(strsplit(gene_string, split = "[[:space:],]+"))
@@ -200,8 +253,10 @@ function(gene_string = "", escala = "micro") {
     summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
   }
 
-  escala <- scale_fill_viridis_c(option = "magma", name = "Custom ssGSEA", na.value = "darkgray")
-  
+  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+    name = "Custom ssGSEA", na.value = "darkgray")
+
   p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
   print(p)
 }
@@ -335,4 +390,74 @@ function(geneset = "") {
   genes_presentes <- intersect(genes_da_via, rownames(matrix_dados))
   
   return(list(genes = as.character(genes_presentes)))
+}
+
+#* Retorna o mapa de referência de uma aba específica
+#* @param view Qual corte mostrar (lateral, medial, sagittal, coronal)
+#* @param escala Qual nível de detalhe (micro, macro)
+#* @serializer svg list(width = 9, height = 7)
+#* @get /plot_reference
+function(view = "lateral", escala = "micro") {
+  
+  if (escala == "macro") {
+    mapa_referencia <- dados_app$mapping_info$region_to_macro_structure
+    coluna <- "macro_region"
+  } else {
+    mapa_referencia <- dados_app$mapping_info$region_to_structure
+    coluna <- "structure_name"
+  }
+
+  mapa_referencia <- mapa_referencia %>%
+    filter(!is.na(.data[[coluna]]))
+  
+  todas_areas <- sort(unique(mapa_referencia[[coluna]]))
+  
+  mapa_referencia[[coluna]] <- factor(mapa_referencia[[coluna]], levels = todas_areas)
+  
+  escala_sem_NA <- scale_fill_discrete(drop = TRUE, na.translate = FALSE, name = "")
+
+  if (view == "lateral") {
+    df_dk <- as.data.frame(ggseg::dk())
+    areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "lateral"]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right lateral"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Córtex Lateral -", ifelse(escala == "macro", "Macro", "Micro")))
+    
+  } else if (view == "medial") {
+    df_dk <- as.data.frame(ggseg::dk())
+    areas <- df_dk$region[df_dk$hemi == "right" & df_dk$view == "medial"]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::dk(), position = position_brain("right medial"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Córtex Medial -", ifelse(escala == "macro", "Macro", "Micro")))
+    
+  } else if (view == "sagittal") {
+    df_aseg <- as.data.frame(ggseg::aseg())
+    areas <- df_aseg$region[grepl("sagittal", df_aseg$view, ignore.case = TRUE)]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("sagittal"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Sagital) -", ifelse(escala == "macro", "Macro", "Micro")))
+    
+  } else if (view == "coronal") {
+    df_aseg <- as.data.frame(ggseg::aseg())
+    areas <- df_aseg$region[grepl("coronal_1", df_aseg$view, ignore.case = TRUE)]
+    dados_plot <- mapa_referencia %>% filter(region %in% areas)
+    
+    p <- ggplot(dados_plot) + geom_brain(atlas = ggseg::aseg(), position = position_brain("coronal_1"), mapping = aes(fill = .data[[coluna]]), color = "black", size = 0.3) + ggtitle(paste("Subcortical (Coronal) -", ifelse(escala == "macro", "Macro", "Micro")))
+    
+  } else {
+    stop("Corte não encontrado.")
+  }
+
+  # 4. Finalização do Plot
+  p_final <- p + 
+    escala_sem_NA + 
+    theme_void() + 
+    theme(
+      legend.position = "bottom",
+      legend.text = element_text(size = 11),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+    ) +
+    guides(fill = guide_legend(ncol = 2, keywidth = 1, keyheight = 1))
+
+  print(p_final)
 }

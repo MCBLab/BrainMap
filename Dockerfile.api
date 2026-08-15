@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:4.3.2
+FROM rocker/tidyverse:4.5.1
 
 # Install system dependencies required for ggseg and plumber
 RUN apt-get update && apt-get install -y \
@@ -18,37 +18,43 @@ RUN apt-get update && apt-get install -y \
     libgdal-dev \
     libgeos-dev \
     libsodium-dev \
-    libfontconfig1-dev \
-    libcairo2-dev \
+    libmagick++-dev \
     cmake \
     libabsl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/jammy/latest"
+ENV R_REPOS="https://packagemanager.posit.co/cran/__linux__/noble/latest"
 
 # 3. Instalando library do R
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
-    install.packages(c('devtools','plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', 'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'viridis', 'svglite', 'cowplot'), Ncpus = 1)"
+    install.packages(c('devtools', 'plumber', 'remotes', 'sf', 'sp', 'maps', 'mapdata', \
+    'maptools', 'rnaturalearth', 'rnaturalearthdata', 'ggrepel', 'svglite', \
+    'vroom', 'msigdbr', 'cowplot'), Ncpus = 1);"
 
 # 4. Instalando pacotes do Bioconductor (GSVA)
 RUN R -e "options(repos = c(CRAN = Sys.getenv('R_REPOS'))); \
     if (!require('BiocManager', quietly = TRUE)) install.packages('BiocManager'); \
-    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)"
+    BiocManager::install(c('GSVA', 'Biobase', 'GSEABase'), update = FALSE, ask = FALSE, Ncpus = 1)" \
+    && R -e "stopifnot(requireNamespace('GSVA', quietly = TRUE), \
+                        requireNamespace('Biobase', quietly = TRUE), \
+                        requireNamespace('GSEABase', quietly = TRUE))"
 
-# 5. Instalando o ggseg mais recente do r-universe
-RUN R -e "devtools::install_github('ggsegverse/ggseg.formats')"
-RUN R -e "remotes::install_github( 'ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never' )"
+# 5. Instalando o ggseg fixado na versão 2.1.1
+RUN R -e "devtools::install_github('ggsegverse/ggseg.formats', ref = 'v0.0.2', upgrade = 'never')"
+RUN R -e "devtools::install_github('ggsegverse/ggseg', ref = 'v2.1.1', upgrade = 'never')"
 
 # Create directory for the API
 RUN mkdir -p /api
 
-# Copy necessary files
-COPY plumber.R /api/
-COPY dados_otimizados.rds /api/
-COPY ontologyssGSEA.csv /api/
-COPY genesets_list.rds /api/
-
 WORKDIR /api
+
+COPY genes_matrix_csv/ /api/genes_matrix_csv/
+COPY mapeamento_regioes.csv /api/
+COPY preparaDados.R /api/
+
+RUN Rscript preparaDados.R
+
+COPY plumber.R /api/
 
 # The port expected by the front-end as per plumber.R
 EXPOSE 33857

@@ -9,6 +9,7 @@ library(readr)
 #Carregando matrizes de dados do BrainSpan
 rows <- vroom("genes_matrix_csv/rows_metadata.csv")
 columns <- vroom("genes_matrix_csv/columns_metadata.csv")
+mapeamento_completo <- vroom("mapeamento_regioes.csv")
 
 counts_raw <- vroom(
   "genes_matrix_csv/expression_matrix.csv",
@@ -25,135 +26,13 @@ matriz_expressao <- matriz_expressao[genes_unicos, ]
 
 matriz_final <- log2(matriz_expressao + 1)
 
-# Mapping dataframes
-input_values <- c(
-  NA,
-  "bankssts",
-  "caudal middle frontal",
-  "fusiform",
-  "inferior parietal",
-  "inferior temporal",
-  "lateral occipital",
-  "lateral orbitofrontal",
-  "middle temporal",
-  "pars opercularis",
-  "pars orbitalis",
-  "pars triangularis",
-  "postcentral",
-  "precentral",
-  "rostral middle frontal",
-  "superior frontal",
-  "superior parietal",
-  "superior temporal",
-  "supramarginal",
-  "temporal pole",
-  "transverse temporal",
-  "insula",
-  "caudal anterior cingulate",
-  "corpus callosum",
-  "cuneus",
-  "entorhinal",
-  "isthmus cingulate",
-  "lingual",
-  "medial orbitofrontal",
-  "parahippocampal",
-  "paracentral",
-  "pericalcarine",
-  "posterior cingulate",
-  "precuneus",
-  "rostral anterior cingulate",
-  "frontal pole"
-)
+mapping_df <- mapeamento_completo %>%
+  select(region, structure_name) %>%
+  as.data.frame()
 
-output_values <- c(
-  NA,
-  "occipital neocortex",
-  "dorsolateral prefrontal cortex",
-  "inferolateral temporal cortex (area TEv, area 20)",
-  "posteroventral (inferior) parietal cortex",
-  "temporal neocortex",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "posterior (caudal) superior temporal cortex (area 22c)",
-  "ventrolateral prefrontal cortex",
-  "orbital frontal cortex",
-  "ventrolateral prefrontal cortex",
-  "primary somatosensory cortex (area S1, areas 3,1,2)",
-  "primary motor cortex (area M1, area 4)",
-  "dorsolateral prefrontal cortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "parietal neocortex",
-  "temporal neocortex",
-  "posteroventral (inferior) parietal cortex",
-  "amygdaloid complex",
-  "primary auditory cortex (core)",
-  "striatum",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "cerebellum",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "hippocampus (hippocampal formation)",
-  "mediodorsal nucleus of thalamus",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "orbital frontal cortex",
-  "hippocampus (hippocampal formation)",
-  "primary motor-sensory cortex (samples)",
-  "primary visual cortex (striate cortex, area V1/17)",
-  "mediodorsal nucleus of thalamus",
-  "parietal neocortex",
-  "anterior (rostral) cingulate (medial prefrontal) cortex",
-  "frontal pole"
-)
-
-output_values_macro <- c(
-  NA, 
-  "lobo temporal", 
-  "lobo frontal", 
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo occipital",
-  "lobo frontal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo temporal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo frontal",
-  "lobo occipital",
-  "lobo temporal",
-  "lobo parietal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo temporal",
-  "lobo frontal",
-  "lobo occipital",
-  "lobo frontal",
-  "lobo parietal",
-  "lobo frontal",
-  "lobo frontal"
-  )
-
-mapping_df <- data.frame(
-  region = input_values,
-  structure_name = output_values,
-  stringsAsFactors = FALSE
-)
-
-mapping_macro <- data.frame(
-  region = input_values,
-  macro_region = output_values_macro,
-  stringsAsFactors = FALSE
-)
+mapping_macro <- mapeamento_completo %>%
+  select(region, macro_region = macro_regions) %>%
+  as.data.frame()
 
 # Mapeamento de idades
 ages <- c(
@@ -229,6 +108,8 @@ columns_enriquecidas <- columns_renomeado %>%
 mapeamento_rapido <- columns_enriquecidas %>%
   select(column_num, broad_age, structure_mapped, macro_region)
 
+message("==> Montando objeto final dados_app (expression_matrix + col_meta + mapping_info)...")
+
 # Salvar os dados otimizados com todas as informações de mapeamento
 dados_app <- list(
   expression_matrix = matriz_final,
@@ -241,6 +122,8 @@ dados_app <- list(
     quick_lookup = mapeamento_rapido
   )
 )
+
+message("==> Baixando gene sets do MSigDB (H, BIOCARTA, KEGG_LEGACY, REACTOME, C5)...")
 
 #Criando dados para as Ontologias
 matrix_dados <- as.matrix(dados_app$expression_matrix)
@@ -255,6 +138,8 @@ all_genesets_df <- bind_rows(h_df, biocarta_df, kegg_df, reactome_df, geneont_df
 
 genesets_list <- split(x = all_genesets_df$gene_symbol, f = all_genesets_df$gs_name)
 
+message("==> Rodando ssGSEA")
+
 # ssGSEA Score
 ssgsea_param <- ssgseaParam(exprData = matrix_dados, geneSets = genesets_list)
 ssgsea_results <- gsva(ssgsea_param)
@@ -267,6 +152,7 @@ tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
     values_to = "Score_ssGSEA"
   )
 
+message("==> Salvando arquivos de saída (dados_otimizados.rds, genesets_list.rds, ontologyssGSEA.csv)...")
 
 saveRDS(dados_app, "dados_otimizados.rds")
 saveRDS(genesets_list, "genesets_list.rds")
