@@ -17,10 +17,13 @@ docker push "$IMG"
 # --concurrency=4: o plumber e single-threaded, entao o default (80) so faria
 #   fila dentro de um unico processo R ate estourar timeout.
 # --timeout=900: /plot_genelist roda GSVA::gsva() por requisicao.
-# --min-instances=1 --no-cpu-throttling: mantem uma instancia quente.
-# --memory=4Gi: o boot mede ~450 MB de dados; o resto e folga para os pacotes
-#   e para o gsva() sob demanda. Confira a metrica de memoria no console e
-#   ajuste depois do primeiro deploy.
+# --min-instances=0: uso esperado e de 10-200 requisicoes/mes, esporadicas.
+#   Manter instancia quente custaria ~US$115-160/mes parada; escalando a zero
+#   o volume cabe na free tier. O front ja tem retry ("API ligando...") que
+#   absorve o cold start no carregamento das listas.
+# --cpu-boost: CPU extra durante o startup, encurta o cold start.
+# --memory=4Gi --cpu=2: nao vale reduzir. Nesse volume o custo e o mesmo
+#   (free tier) e mais CPU deixa o cold start e o gsva() mais rapidos.
 gcloud run deploy brainmap-api \
   --image="$IMG" \
   --region="$REGION" \
@@ -28,5 +31,6 @@ gcloud run deploy brainmap-api \
   --memory=4Gi --cpu=2 \
   --concurrency=4 \
   --timeout=900 \
-  --min-instances=1 --max-instances=5 \
-  --no-cpu-throttling
+  --min-instances=0 --max-instances=5 \
+  --cpu-throttling \
+  --cpu-boost
