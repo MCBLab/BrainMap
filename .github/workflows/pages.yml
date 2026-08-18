@@ -1,0 +1,64 @@
+name: Deploy front to GitHub Pages
+
+on:
+  push:
+    # Trocar para main depois que a VEGAbrain for mergeada: o Pages publica um
+    # unico site por repositorio, entao duas branches aqui brigariam entre si.
+    branches: [VEGAbrain]
+    paths:
+      - 'front/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install
+        working-directory: front
+        run: npm ci
+
+      - name: Build
+        working-directory: front
+        # Variavel de repositorio (Settings > Secrets and variables > Actions >
+        # Variables), com a URL https do Cloud Run. Nao e secret: o valor vai
+        # embutido no JS publico de qualquer jeito.
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::defina a variavel de repositorio VITE_API_URL com a URL do Cloud Run"
+            exit 1
+          fi
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: front/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

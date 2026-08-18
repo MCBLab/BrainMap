@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import Select from 'react-select';
 
+// URL da API, injetada em build time via VITE_API_URL (no GitHub Pages aponta
+// para o Cloud Run). O fallback mantem o desenvolvimento local funcionando.
+const API = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:33857').replace(/\/$/, '');
+
 export default function Home() {
   const [abaAtual, setAbaAtual] = useState('genelist');
   const [escalaRegiao, setEscalaRegiao] = useState('micro');
@@ -42,7 +46,7 @@ export default function Home() {
     const endpoint = abaAtual === 'gene' ? '/list_genes' : '/list_ontologies';
 
     const buscarComRetry = () => {
-      fetch(`http://127.0.0.1:33857${endpoint}`)
+      fetch(`${API}${endpoint}`)
         .then((res) => {
           if (!res.ok) throw new Error("API ligando...");
           return res.json();
@@ -100,7 +104,7 @@ export default function Home() {
       params.append('escala', escalaRegiao);
 
       // 2. CHECAGEM RÁPIDA: Quem existe e quem não existe?
-      const resValidacao = await fetch('http://127.0.0.1:33857/validate_genelist', {
+      const resValidacao = await fetch(`${API}/validate_genelist`, {
         method: 'POST', body: params
       });
       const dadosValidacao = await resValidacao.json();
@@ -122,7 +126,7 @@ export default function Home() {
       }
 
       // 3. GERAÇÃO DA IMAGEM
-      const resposta = await fetch('http://127.0.0.1:33857/plot_genelist', {
+      const resposta = await fetch(`${API}/plot_genelist`, {
         method: 'POST', body: params
       });
       if (!resposta.ok) throw new Error("Erro");
@@ -153,8 +157,8 @@ export default function Home() {
     urlImagem = imagemCustomizada;
   } else if (selecionada && abaAtual !== 'genelist') {
     urlImagem = abaAtual === 'gene' 
-      ? `http://127.0.0.1:33857/plot_brain?gene=${selecionada.value}&escala=${escalaRegiao}`
-      : `http://127.0.0.1:33857/plot_ontology?geneset=${selecionada.value}&escala=${escalaRegiao}`;
+      ? `${API}/plot_brain?gene=${selecionada.value}&escala=${escalaRegiao}`
+      : `${API}/plot_ontology?geneset=${selecionada.value}&escala=${escalaRegiao}`;
   }
 
 
@@ -180,11 +184,11 @@ export default function Home() {
       let opcoesFetch = {};
 
     if (abaAtual === 'gene') {
-        url = `http://127.0.0.1:33857/data_brain?gene=${selecionada.value}&escala=${escalaRegiao}`;
+        url = `${API}/data_brain?gene=${selecionada.value}&escala=${escalaRegiao}`;
       } else if (abaAtual === 'ontology') {
-        url = `http://127.0.0.1:33857/data_ontology?geneset=${selecionada.value}&escala=${escalaRegiao}`;
+        url = `${API}/data_ontology?geneset=${selecionada.value}&escala=${escalaRegiao}`;
       } else if (abaAtual === 'genelist') {
-        url = 'http://127.0.0.1:33857/data_genelist';
+        url = `${API}/data_genelist`;
         const params = new URLSearchParams();
         params.append('gene_string', textoListaGenes);
         params.append('escala', escalaRegiao);
@@ -216,7 +220,7 @@ export default function Home() {
     
     try {
       // encodeURIComponent protege nomes complexos na hora de virar URL
-      const urlFetch = `http://127.0.0.1:33857/genes_da_via?geneset=${encodeURIComponent(nomeOntologia)}`;
+      const urlFetch = `${API}/genes_da_via?geneset=${encodeURIComponent(nomeOntologia)}`;
       
       const res = await fetch(urlFetch);
       const dados = await res.json();
@@ -615,7 +619,7 @@ export default function Home() {
             }}>
               <img
                 key={`${abaMapaRef}-${escalaMapaRef}`}
-                src={`http://127.0.0.1:33857/plot_reference?view=${abaMapaRef}&escala=${escalaMapaRef}`}
+                src={`${API}/plot_reference?view=${abaMapaRef}&escala=${escalaMapaRef}`}
                 alt={`Mapa ${abaMapaRef}`}
                 style={{ 
                   maxWidth: '70%', 
