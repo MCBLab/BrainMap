@@ -12,7 +12,10 @@ cors <- function(res) {
 }
 
 dados_app <- readRDS("dados_otimizados.rds")
-tabela_final_ssgsea <- read.csv("ontologyssGSEA.csv")
+# Médias já agregadas por preparaDados.R (o CSV bruto de ~9.7M linhas não é
+# mais lido no boot, o que mantém o startup dentro do limite do Cloud Run)
+ontologia_micro <- readRDS("ontologia_micro.rds")
+ontologia_macro <- readRDS("ontologia_macro.rds")
 genesets_list <- readRDS("genesets_list.rds")
 
 matrix_dados <- dados_app$expression_matrix
@@ -22,13 +25,32 @@ meta_limpo <- dados_app$col_meta %>%
   filter(!is.na(region), !is.na(broad_age)) %>%
   select(column_num, region, broad_age, macro_region)
 
-tabela_base_ontologias <- tabela_final_ssgsea %>%
-  mutate(Amostra = as.numeric(Amostra)) %>%
-  inner_join(meta_limpo, by = c("Amostra" = "column_num"), relationship = "many-to-many")
+# Combinações (idade, região) efetivamente amostradas: usadas para espalhar o
+# score da macro-região de volta nas regiões que o ggseg desenha
+regioes_por_macro <- meta_limpo %>%
+  filter(!is.na(macro_region)) %>%
+  distinct(broad_age, region, macro_region)
 
 # 2. LISTAS OTIMIZADAS (À prova de falhas)
 setgene <- rownames(matrix_dados)
-setontologies <- unique(tabela_final_ssgsea$GeneSet)
+setontologies <- sort(unique(ontologia_micro$GeneSet))
+
+# Devolve (broad_age, region, Score_Medio_ssGSEA) para uma ontologia. Na escala
+# macro cada região recebe a média da macro-região a que pertence.
+scores_ontologia <- function(geneset, escala) {
+  if (escala == "macro") {
+    ontologia_macro %>%
+      filter(GeneSet == geneset) %>%
+      inner_join(regioes_por_macro,
+                 by = c("broad_age", "macro_region"),
+                 relationship = "many-to-many") %>%
+      select(broad_age, region, Score_Medio_ssGSEA)
+  } else {
+    ontologia_micro %>%
+      filter(GeneSet == geneset) %>%
+      select(broad_age, region, Score_Medio_ssGSEA)
+  }
+}
 
 #* @get /list_genes
 function() {
@@ -181,31 +203,18 @@ function(gene = "SOX10", escala = "micro") {
 function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
 
-  dados_base <- tabela_base_ontologias %>%
-    filter(GeneSet == geneset) %>%
-    filter(!is.na(broad_age)) %>%
+  dados_prontos <- scores_ontologia(geneset, escala)
+
+  if (nrow(dados_prontos) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
+
+  dados_prontos <- dados_prontos %>%
     mutate(broad_age = factor(broad_age, levels = ordem_idades))
 
-  if (nrow(dados_base) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
-
-  if(escala == "macro") {
-    dados_prontos <- dados_base %>%
-      filter(!is.na(macro_region)) %>%
-      group_by(broad_age, macro_region) %>%
-      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
-      ungroup() %>%
-      distinct(broad_age, region, Score_Medio_ssGSEA)
-  } else {
-    dados_prontos <- dados_base %>%
-    group_by(broad_age, region) %>%
-    summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-  }
-
-  escala <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"), 
-    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8), 
+  escala_cor <- scale_fill_gradientn( colors = c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845"),
+    #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8),
     name = "ssGSEA Score", na.value = "darkgray")
-  
-  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala)
+
+  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala_cor)
   print(p)
 }
 
@@ -297,27 +306,14 @@ function(gene = "SOX10", escala = "micro") {
 #* @get /data_ontology
 function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
-  dados_base <- tabela_base_ontologias %>%
-    filter(GeneSet == geneset) %>%
-    filter(!is.na(broad_age)) %>%
+
+  dados_prontos <- scores_ontologia(geneset, escala)
+
+  if (nrow(dados_prontos) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
+
+  dados_prontos <- dados_prontos %>%
     mutate(broad_age = factor(broad_age, levels = ordem_idades)) %>%
-    group_by(broad_age, region) %>%
-    summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-
-  if (nrow(dados_base) == 0) stop("Ontologia não encontrada ou sem dados para plotagem.")
-
-  if(escala == "macro") {
-    dados_prontos <- dados_base %>%
-      filter(!is.na(macro_region)) %>%
-      group_by(broad_age, macro_region) %>%
-      mutate(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE)) %>%
-      ungroup() %>%
-      distinct(broad_age, region, Score_Medio_ssGSEA)
-  } else {
-    dados_prontos <- dados_base %>%
-    group_by(broad_age, region) %>%
-    summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
-  }
+    arrange(broad_age, region)
 
   return(dados_prontos)
 }

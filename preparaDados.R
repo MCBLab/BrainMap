@@ -152,8 +152,36 @@ tabela_final_ssgsea <- as.data.frame(ssgsea_results) %>%
     values_to = "Score_ssGSEA"
   )
 
-message("==> Salvando arquivos de saída (dados_otimizados.rds, genesets_list.rds, ontologyssGSEA.csv)...")
+message("==> Agregando scores por região (micro) e macro-região (macro)...")
+
+# O plumber.R só precisa das médias por (broad_age, region) e por
+# (broad_age, macro_region). Agregar aqui derruba ~9.7M linhas para poucos
+# milhares por escala, o que faz a API subir em segundos em vez de minutos.
+meta_agg <- columns_enriquecidas %>%
+  rename(region = structure_mapped) %>%
+  filter(!is.na(region), !is.na(broad_age)) %>%
+  select(column_num, region, broad_age, macro_region)
+
+scores_com_meta <- tabela_final_ssgsea %>%
+  mutate(Amostra = as.numeric(Amostra)) %>%
+  inner_join(meta_agg, by = c("Amostra" = "column_num"), relationship = "many-to-many")
+
+ontologia_micro <- scores_com_meta %>%
+  group_by(GeneSet, broad_age, region) %>%
+  summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+
+ontologia_macro <- scores_com_meta %>%
+  filter(!is.na(macro_region)) %>%
+  group_by(GeneSet, broad_age, macro_region) %>%
+  summarise(Score_Medio_ssGSEA = mean(Score_ssGSEA, na.rm = TRUE), .groups = "drop")
+
+rm(scores_com_meta)
+gc()
+
+message("==> Salvando arquivos de saída (dados_otimizados.rds, genesets_list.rds, ontologia_micro.rds, ontologia_macro.rds, ontologyssGSEA.csv)...")
 
 saveRDS(dados_app, "dados_otimizados.rds")
 saveRDS(genesets_list, "genesets_list.rds")
+saveRDS(ontologia_micro, "ontologia_micro.rds")
+saveRDS(ontologia_macro, "ontologia_macro.rds")
 write_csv(tabela_final_ssgsea, "ontologyssGSEA.csv")
