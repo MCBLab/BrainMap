@@ -63,26 +63,18 @@ developing human brain}
 %% Abstract
 %%==================================================================%%
 
-\abstract{The BrainSpan atlas is one of the most widely reused resources in
-developmental neuroscience, yet inspecting it spatially remains awkward. The
-public portal returns tabular and non-anatomical summaries, and the
-reproducible alternative---plotting the data onto a brain atlas with an
-analysis package---requires programming skill, a local copy of a large
-expression matrix, and a hand-written mapping from donor tissue labels to atlas
-regions. As a result, the developmental and anatomical structure of the data is
-rarely seen by the people best placed to interpret it. We present VEGABrain, an
-openly accessible web tool that renders BrainSpan bulk RNA-seq onto
-Desikan--Killiany cortical and subcortical atlas surfaces across five
-developmental windows spanning the first trimester to adulthood. Beyond
-single-gene maps, VEGABrain contributes a composite per-region enrichment layer:
-single-sample gene set enrichment analysis (ssGSEA) scores were precomputed for
-18{,}650 gene sets drawn from Gene Ontology, Reactome, KEGG, BioCarta, the Human
-Phenotype Ontology and the MSigDB hallmark collection, and aggregated to a score
-for every gene set, developmental window and brain region. Users may also submit
-an arbitrary gene list and obtain its ssGSEA map across development, computed on
-demand. Every map is exportable as vector graphics and every underlying table as
-CSV. VEGABrain is served as a containerised R API behind a static front end and
-its source is openly available.}
+\abstract{RNA-seq datasets are widely reused resources in developmental neuroscience, 
+yet exploring their spatial organization remains difficult. Here, we present VEGABrain, 
+an openly accessible web tool that renders bulk RNA-seq onto cortical and subcortical 
+brain atlas surfaces across five human developmental windows spanning the first trimester 
+to adulthood. Beyond single-gene maps, VEGABrain introduces a composite per-region enrichment 
+layer based on precomputed single-sample gene set enrichment analysis (ssGSEA) scores for ~19,000 
+gene sets from Gene Ontology, Reactome, KEGG, BioCarta, the Human Phenotype Ontology, and 
+the MSigDB Hallmark collection, aggregated into enrichment scores for every gene set, 
+developmental window, and brain region. Users can also submit custom gene lists to generate 
+ssGSEA-based spatial maps across development on demand. VEGABrain is distributed as a 
+containerized R API with an intuitive web interface, providing an easy-to-query resource 
+for exploring spatiotemporal gene expression in the developing human brain.}
 
 \keywords{Neuroinformatics, Brain development, BrainSpan, Gene set enrichment,
 ssGSEA, Data visualization, Web application}
@@ -99,8 +91,7 @@ reused datasets in neuroscience. The BrainSpan atlas
 subcortical structures across prenatal and postnatal donors, and subsequent
 integrative work built on it to relate developmental expression to
 neuropsychiatric risk \citep{Li2018} and to evolutionary divergence between
-human and macaque \citep{Zhu2018}. The resource is mature, well documented and
-freely available.
+human and macaque \citep{Zhu2018}.
 
 What has not kept pace is the ease of \emph{seeing} it. A researcher who wants
 to know where and when a gene, or a set of genes, is expressed in the developing
