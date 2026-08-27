@@ -1,0 +1,19 @@
+.git/
+.gitignore
+.Rhistory
+
+# Front-end tem seu proprio build context (./front)
+front/
+
+# Artefatos gerados por preparaDados.R dentro da propria imagem
+dados_otimizados.rds
+genesets_list.rds
+ontologyssGSEA.csv
+ontologia_micro.rds
+ontologia_macro.rds
+
+# Nao fazem parte da API
+app.R
+ETL.qmd
+build.log
+*.html

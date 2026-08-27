@@ -56,8 +56,8 @@ RUN Rscript preparaDados.R
 
 COPY plumber.R /api/
 
-# The port expected by the front-end as per plumber.R
-EXPOSE 33857
+# Cloud Run injeta a porta via $PORT; 8080 e o default local
+EXPOSE 8080
 
 # Command to start the Plumber API
-CMD ["R", "-e", "pr <- plumber::plumb('plumber.R'); pr$run(host = '0.0.0.0', port = 33857, docs = TRUE)"]
+CMD ["R", "-e", "pr <- plumber::plumb('plumber.R'); pr$run(host = '0.0.0.0',  port=as.numeric(Sys.getenv('PORT', 8080)), docs = TRUE)"]

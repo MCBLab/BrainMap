@@ -1,0 +1,10 @@
+# LaTeX build intermediates (main.pdf is kept -- it is the deliverable)
+main.aux
+main.bbl
+main.blg
+main.log
+main.out
+main.spl
+main.fls
+main.fdb_latexmk
+*.synctex.gz

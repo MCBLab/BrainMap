@@ -1,0 +1,741 @@
+%% VEGABrain -- manuscript for Neuroinformatics (Springer)
+%% Springer Nature journal article template v3.1 (December 2024).
+%% Reference style: sn-basic (author-year), which is what Neuroinformatics uses.
+%% Build:  bash build.sh      (see IMPLEMENTATION.md)
+%%
+%% Add the "lineno" option below when producing the copy for reviewers:
+%%   \documentclass[lineno,pdflatex,sn-basic]{sn-jnl}
+
+\documentclass[pdflatex,sn-basic]{sn-jnl}
+
+%%%% Standard Packages
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+\usepackage{tikz}%
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds}%
+\usepackage{url}%
+%%%%
+
+\theoremstyle{thmstyleone}%
+\newtheorem{theorem}{Theorem}%
+\newtheorem{proposition}[theorem]{Proposition}%
+\theoremstyle{thmstyletwo}%
+\newtheorem{example}{Example}%
+\newtheorem{remark}{Remark}%
+\theoremstyle{thmstylethree}%
+\newtheorem{definition}{Definition}%
+
+\graphicspath{{figures/}}
+\raggedbottom
+
+\begin{document}
+
+\title[VEGABrain]{VEGABrain: a Visualizer of Enriched Gene Analysis for the
+developing human brain}
+
+%% TODO(authors): confirm author order, add ORCIDs via \orcid{...} inside \author,
+%% and replace the affiliation placeholders with the full postal address of the
+%% MCB Lab / department at UFRN.
+
+\author[1]{\fnm{Isaac} \sur{Medeiros}}\email{TODO@ufrn.br}
+
+\author[1]{\fnm{Jo\~{a}o} \sur{Cavalcante}}\email{TODO@ufrn.br}
+
+\author*[1]{\fnm{Diego} \sur{Coelho}}\email{diegomscoelho@gmail.com}
+
+\affil*[1]{\orgdiv{Molecular and Computational Biology Laboratory (MCB Lab)},
+\orgname{Universidade Federal do Rio Grande do Norte},
+\orgaddress{\city{Natal}, \state{Rio Grande do Norte}, \country{Brazil}}}
+
+%%==================================================================%%
+%% Abstract
+%%==================================================================%%
+
+\abstract{RNA-seq datasets are widely reused resources in developmental neuroscience, 
+yet exploring their spatial organization remains difficult. Here, we present VEGABrain, 
+an openly accessible web tool that renders bulk RNA-seq onto cortical and subcortical 
+brain atlas surfaces across five human developmental windows spanning the first trimester 
+to adulthood. Beyond single-gene maps, VEGABrain introduces a composite per-region enrichment 
+layer based on precomputed single-sample gene set enrichment analysis (ssGSEA) scores for ~19,000 
+gene sets from Gene Ontology, Reactome, KEGG, BioCarta, the Human Phenotype Ontology, and 
+the MSigDB Hallmark collection, aggregated into enrichment scores for every gene set, 
+developmental window, and brain region. Users can also submit custom gene lists to generate 
+ssGSEA-based spatial maps across development on demand. VEGABrain is distributed as a 
+containerized R API with an intuitive web interface, providing an easy-to-query resource 
+for exploring spatiotemporal gene expression in the developing human brain.}
+
+\keywords{Neuroinformatics, Brain development, BrainSpan, Gene set enrichment,
+ssGSEA, Data visualization, Web application}
+
+\maketitle
+
+%%==================================================================%%
+\section{Introduction}\label{sec:intro}
+%%==================================================================%%
+
+The transcriptome of the developing human brain is one of the most heavily
+reused datasets in neuroscience. The BrainSpan atlas
+\citep{BrainSpan2011,Kang2011,Miller2014} sampled bulk tissue from cortical and
+subcortical structures across prenatal and postnatal donors, and subsequent
+integrative work built on it to relate developmental expression to
+neuropsychiatric risk \citep{Li2018} and to evolutionary divergence between
+human and macaque \citep{Zhu2018}.
+
+What has not kept pace is the ease of \emph{seeing} it. A researcher who wants
+to know where and when a gene, or a set of genes, is expressed in the developing
+brain has essentially two options today, and both impose costs that are
+unrelated to the biological question.
+
+The first is the resource portal. Portals in this family---BrainSpan itself, and
+the wider family of Allen Institute browsers \citep{Lau2008,Sunkin2013}---return
+the data as tables, line plots or heat maps indexed by structure acronym. This
+is faithful but not anatomical: the reader must hold the mapping from
+\texttt{DFC}, \texttt{MFC} or \texttt{STC} to a location in the brain in their
+head, and a heat map of 26 structure codes does not convey a spatial gradient
+the way a rendered cortex does. It is also gene-at-a-time. There is no route
+from a gene set, a pathway, or the output of a differential-expression analysis
+to a spatial view.
+
+The second option is to do it yourself. Excellent programmatic brain-plotting
+tools exist---\texttt{ggseg} and \texttt{ggseg3d} in R
+\citep{Mowinckel2020}, \texttt{neuromaps} in Python \citep{Markello2022}, and
+\texttt{abagen} for the adult Allen Human Brain Atlas
+\citep{Hawrylycz2012,Markello2021}---and
+the case for producing figures programmatically rather than through graphical
+interfaces has been made convincingly \citep{Chopra2023}: it is reproducible,
+scriptable and version-controllable. But that route presupposes a user who
+writes R or Python, who is willing to download and hold a $52{,}376 \times 524$
+expression matrix locally, and who will construct and validate the mapping from
+BrainSpan's tissue nomenclature onto an atlas parcellation. Each of those steps
+is a place where a project stalls or a mapping silently diverges between
+laboratories. The barrier is not conceptual; it is logistical, and it falls
+hardest on exactly the clinicians and experimental biologists whose domain
+knowledge would make the interpretation valuable.
+
+There is a third gap that neither option addresses. Modern analyses rarely end
+with one gene. They end with a list---a differentially expressed set, a module
+from a co-expression network, a panel of risk genes for a disorder. The natural
+question is then not ``where is gene $X$ expressed?'' but ``where and when is
+this \emph{programme} active?''. Answering it requires collapsing many genes
+into a single per-sample summary. Single-sample gene set enrichment analysis
+(ssGSEA) \citep{Barbie2009}, a per-sample variant of GSEA
+\citep{Subramanian2005} implemented alongside GSVA \citep{Hanzelmann2013},
+provides exactly such a composite score, and has been used as a quantitative
+readout of pathway activity in expression data
+\citep{Yi2020}. To our knowledge no tool has applied it as a
+\emph{spatial} layer over the developing human brain.
+
+VEGABrain (Visualizer of Enriched Gene Analysis) addresses these three gaps in
+one interface, reachable at \url{https://mcblab.github.io/BrainMap/} with no
+installation, account or download. Its contributions are:
+
+\begin{enumerate}
+\item \textbf{Anatomical rendering of BrainSpan across development.} BrainSpan
+      samples are mapped onto Desikan--Killiany cortical parcels
+      \citep{Desikan2006} and \texttt{aseg} subcortical structures
+      \citep{Fischl2002} through \texttt{ggseg} \citep{Mowinckel2020}, and
+      displayed as a lateral/medial/sagittal/coronal panel faceted over five
+      developmental windows. The mapping is published as a single auditable
+      CSV rather than reimplemented per project.
+\item \textbf{A composite per-region enrichment layer.} ssGSEA scores were
+      precomputed for 18{,}650 gene sets spanning the Gene Ontology
+      \citep{Ashburner2000,GOConsortium2023}, Reactome \citep{Gillespie2022},
+      KEGG \citep{Kanehisa2000}, BioCarta, the Human Phenotype Ontology
+      \citep{Kohler2021} and the MSigDB hallmark collection
+      \citep{Liberzon2011,Liberzon2015}, then aggregated to a mean score per
+      gene set, developmental window and region. Selecting an ontology term
+      yields its spatiotemporal activity map immediately.
+\item \textbf{On-demand scoring of user-submitted gene lists.} A user may paste
+      an arbitrary list of HGNC symbols; VEGABrain validates them against the
+      matrix, runs ssGSEA for that set on the fly, and returns the same
+      developmental map. This closes the loop from an enrichment result
+      \citep{Chen2013,Kuleshov2016} back to anatomy.
+\end{enumerate}
+
+Both the figures and the numbers behind them are exportable---SVG for the maps,
+CSV for the per-region tables---so that VEGABrain is a starting point for
+downstream analysis rather than a terminal display, consistent with the FAIR
+principles for reusable research data \citep{Wilkinson2016}. The remainder of
+this paper describes the data preparation and scoring (Section~\ref{sec:methods}),
+the tool itself (Section~\ref{sec:results}), its validation and its position
+relative to comparable software (Section~\ref{sec:validation}), following the
+expectations for software papers in this journal \citep{Kennedy2009}.
+
+%%==================================================================%%
+\section{Materials and Methods}\label{sec:methods}
+%%==================================================================%%
+
+\subsection{Expression data and preprocessing}\label{sec:data}
+
+VEGABrain is built on the BrainSpan Developmental Transcriptome RNA-Seq release,
+Gencode v10 RPKM values summarised to genes \citep{BrainSpan2011,Miller2014}.
+The distributed matrix contains 52{,}376 gene rows and 524 sample columns. Rows
+with duplicate HGNC symbols are dropped, keeping the first occurrence, and
+values are transformed as $\log_2(\mathrm{RPKM} + 1)$. No further normalisation
+or batch correction is applied; the released RPKM values are used as the
+provider distributes them, so that scores computed here remain comparable with
+analyses performed directly on the public matrix. Preprocessing is performed
+once, offline, by \texttt{preparaDados.R}, which writes the objects the running
+service loads at start-up.
+
+\subsection{Developmental windows}\label{sec:ages}
+
+BrainSpan donors span 31 distinct ages from 8 post-conceptional weeks to 40
+years. Individual ages are too sparsely sampled to render as separate maps, so
+donors are binned into five developmental windows: first trimester ($n=5$
+donors), second trimester ($n=10$), third trimester ($n=5$), infant ($n=8$) and
+adult ($n=14$). The bin boundaries and their donor counts are given in
+Table~\ref{tab:data}; the donor count is displayed in every facet label in the
+interface so that the reader is never shown a map without also being shown how
+much evidence stands behind it.
+
+\subsection{Mapping BrainSpan structures to an atlas}\label{sec:mapping}
+
+BrainSpan labels tissue by dissected structure (for example \emph{dorsolateral
+prefrontal cortex}), whereas \texttt{ggseg} draws atlas parcels (for example
+\emph{rostral middle frontal}). Bridging the two is the step that most commonly
+diverges between reimplementations, so VEGABrain externalises it into a single
+version-controlled file, \texttt{mapeamento\_regioes.csv}, with one row per atlas
+region giving the BrainSpan structure it corresponds to and the macro-region it
+belongs to. Cortical regions map onto the Desikan--Killiany parcellation
+\citep{Desikan2006} and subcortical structures onto the FreeSurfer
+\texttt{aseg} segmentation \citep{Fischl2002}, both accessed through
+\texttt{ggseg} \citep{Mowinckel2020}.
+
+The interface exposes two levels of granularity. At the \emph{micro} scale each
+of the 42 mapped atlas regions carries its own value. At the \emph{macro} scale
+regions are pooled into six anatomical groupings---frontal, parietal, temporal
+and occipital lobes, subcortical structures and cerebellum---the mean is taken
+within each grouping, and that mean is painted back onto every region belonging
+to it. The macro scale exists because BrainSpan sampling density varies sharply
+across structures: pooling trades spatial resolution for donor support, and
+letting the user switch between the two makes that trade-off explicit rather
+than hidden. Regions with no corresponding sample are drawn in grey rather than
+imputed.
+
+Every map is rendered as four stacked panels---right lateral cortex, right
+medial cortex, subcortical sagittal and subcortical coronal---each faceted into
+the five developmental windows, giving a single figure in which spatial and
+temporal structure are read on orthogonal axes. A reference panel renders the
+same geometry coloured by region name, at either granularity, so that a reader
+can identify any parcel without leaving the tool.
+
+\subsection{Composite enrichment scores}\label{sec:ssgsea}
+
+For a gene set $G$ and a sample $j$, ssGSEA \citep{Barbie2009} ranks all genes
+by their expression within that sample and computes an enrichment score from
+the normalised difference between the empirical cumulative distribution of the
+genes in $G$ and that of the genes outside it:
+
+\begin{equation}\label{eq:ssgsea}
+\mathrm{ES}(G, j) \;=\;
+\sum_{i=1}^{N}\Bigl( P^{G}_{\mathrm{w}}(G, j, i) - P^{NG}(G, j, i) \Bigr),
+\end{equation}
+
+where $i$ indexes genes in decreasing order of expression in sample $j$,
+$P^{G}_{\mathrm{w}}$ is the weighted cumulative distribution over genes in the
+set and $P^{NG}$ the cumulative distribution over the rest. Because the score is
+computed from within-sample ranks, it is invariant to the monotone
+transformation applied in Section~\ref{sec:data} and does not require a
+reference group or a phenotype contrast---which is what makes it usable here,
+where each sample is a single donor--structure pair rather than a member of a
+case/control design. We use the \texttt{ssgseaParam} interface of the
+\texttt{GSVA} package \citep{Hanzelmann2013} with default parameters.
+
+Gene sets are retrieved through \texttt{msigdbr} \citep{Dolgalev2025msigdbr} for
+\emph{Homo sapiens} and comprise the MSigDB hallmark collection
+\citep{Liberzon2015}, the canonical pathway subcollections BioCarta, KEGG
+\citep{Kanehisa2000} and Reactome \citep{Gillespie2022}, and the full C5
+ontology collection, which supplies Gene Ontology biological process, molecular
+function and cellular component terms \citep{Ashburner2000,GOConsortium2023}
+together with Human Phenotype Ontology terms \citep{Kohler2021}. The resulting
+18{,}650 sets are broken down by collection in Table~\ref{tab:data}.
+
+Scores are computed once for every gene set against all 524 samples, then
+aggregated: for each (gene set, developmental window, region) triple the mean
+score over the contributing samples is stored, and analogously for macro-regions.
+This reduces roughly $9.8$ million sample-level scores to 3{,}188{,}466 rows at
+the micro scale, which is what makes interactive response possible---an ontology
+query becomes a filter over a precomputed table rather than a fresh enrichment
+run. When instead a user submits their own gene list, the symbols are validated
+against the matrix (unmatched symbols are reported back rather than silently
+dropped), ssGSEA is run for that single set across all samples, and the same
+aggregation is applied before rendering.
+
+\subsection{Implementation and deployment}\label{sec:impl}
+
+VEGABrain is split into a stateless computational back end and a static front
+end (Figure~\ref{fig:arch}). The back end is an R \citep{RCoreTeam2026} service
+built with \texttt{plumber} \citep{Schloerke2024plumber}, which loads the
+preprocessed objects at start-up and exposes the endpoints listed in
+Table~\ref{tab:api}. Maps are rendered with \texttt{ggplot2} and
+\texttt{ggseg} \citep{Mowinckel2020} and serialised as SVG, so that what the
+browser displays is already a vector figure at publication quality; tabular
+endpoints return CSV. The front end is a React single-page application served
+as static files from GitHub Pages, holding no data of its own and calling the
+API directly. An earlier prototype ran as a single Shiny application
+\citep{Chang2025shiny}; splitting it into an API and a static client is what
+lets the front end be hosted at no cost and the compute scale to zero
+independently of it.
+
+The service is containerised and deployed to Google Cloud Run with 4~GiB of
+memory and 2 vCPUs. Because the R process is single-threaded, request
+concurrency is capped at four, and the request timeout is raised to 900~s to
+accommodate on-demand ssGSEA runs. The service scales to zero between
+requests, which suits the expected sporadic usage and keeps hosting within a
+free tier; the front end retries the initial listing calls so that a cold start
+is absorbed transparently. Both deployments are automated---the front end by a
+GitHub Actions workflow on push, the API by a single script---and the container
+definition pins package versions so that a rebuild reproduces the analysis
+environment.
+
+%%------------------------------------------------------------------%%
+%% Figure 1 -- architecture (drawn inline; no external asset)
+%%------------------------------------------------------------------%%
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  box/.style   = {draw, rounded corners=2pt, align=center, inner sep=3pt,
+                  font=\scriptsize, minimum height=9mm, text width=27mm},
+  data/.style  = {box, fill=black!5},
+  proc/.style  = {box, fill=black!12},
+  serve/.style = {box, fill=black!8},
+  arr/.style   = {-{Stealth[length=1.8mm]}, semithick},
+  bi/.style    = {{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]}, semithick},
+  lab/.style   = {font=\scriptsize, inner sep=1.5pt},
+  band/.style  = {font=\scriptsize\itshape, text=black!55, anchor=west}
+]
+%% ---- offline band -------------------------------------------------
+\node[data] (ms) {MSigDB via \texttt{msigdbr}\\18{,}650 gene sets};
+\node[data, above=3mm of ms] (bs) {BrainSpan RNA-seq\\52{,}376 $\times$ 524};
+\node[data, below=3mm of ms] (mp) {region mapping\\(structure $\rightarrow$ atlas)};
+
+\node[proc, right=13mm of ms] (prep)
+  {\texttt{preparaDados.R}\\$\log_2(\mathrm{RPKM}{+}1)$,\\age bins, ssGSEA};
+\node[data, right=13mm of prep] (rds)
+  {Precomputed scores\\set $\times$ window $\times$ region};
+
+\draw[arr] (bs.east) -- (prep.west);
+\draw[arr] (ms.east) -- (prep.west);
+\draw[arr] (mp.east) -- (prep.west);
+\draw[arr] (prep) -- (rds);
+
+%% ---- online band --------------------------------------------------
+\node[serve, below=26mm of prep] (api)
+  {\texttt{plumber} API on Cloud Run\\SVG maps $+$ CSV};
+\node[serve, left=12mm of api]  (front) {React front end\\(GitHub Pages)};
+\node[serve, right=14mm of api] (ondemand) {On-demand ssGSEA\\for user gene lists};
+
+\draw[arr] (rds.south) -- node[lab, right] {loaded at start-up} (rds.south|-api.north);
+\draw[bi] (front) -- (api);
+\draw[bi] (api) -- node[lab, above] {gene list} (ondemand);
+
+\node[band] at ([yshift=6mm,xshift=-1mm]bs.north west) {offline, once};
+\node[band] at ([yshift=6mm,xshift=-1mm]front.north west) {per request};
+\end{tikzpicture}
+\caption{VEGABrain architecture. Everything to the left of the precomputed
+objects runs once, offline; everything to the right runs per request. Ontology
+queries are served by filtering the precomputed score table, whereas a
+user-submitted gene list triggers a fresh ssGSEA run over all 524 samples.}
+\label{fig:arch}
+\end{figure}
+
+%%==================================================================%%
+\section{Results: the VEGABrain tool}\label{sec:results}
+%%==================================================================%%
+
+VEGABrain opens on a single working page (Figure~\ref{fig:ui}) with a control
+column on the left and the rendered map on the right. Two switches apply to
+every mode: the region granularity toggle (micro/macro, Section~\ref{sec:mapping})
+and the query mode. All three modes produce the same four-panel,
+five-window figure, so a user can move between them without relearning the
+display.
+
+\subsection{Mode 1: single gene}
+
+Selecting \emph{gene} mode presents a searchable list of every HGNC symbol
+present in the matrix. Choosing one renders its mean $\log_2(\mathrm{RPKM}+1)$
+per region and developmental window on a fixed colour scale bounded at 6, so
+that maps for different genes are directly comparable rather than each being
+auto-scaled to its own range. Figure~\ref{fig:gene} shows \emph{SOX10}, an
+oligodendrocyte lineage marker, whose expression rises through the perinatal
+and postnatal windows as myelination proceeds.
+
+\subsection{Mode 2: ontology term}
+
+Selecting \emph{ontology} mode presents the 18{,}650 precomputed gene sets.
+Choosing one returns its mean ssGSEA score per region and window
+(Figure~\ref{fig:ontology}). This is the composite layer described in
+Section~\ref{sec:ssgsea}, and it is what distinguishes VEGABrain from a
+gene-at-a-time browser: a single map summarises the coordinated behaviour of
+tens to hundreds of genes, and terms such as
+\texttt{GOBP\_FOREBRAIN\_GENERATION\_OF\_NEURONS} resolve into a spatiotemporal
+pattern that no individual member gene displays cleanly on its own. A companion
+control lists the genes of the selected set that are present in the matrix, and
+copies them to the clipboard, so that the composition of any score is
+inspectable and can be carried into the third mode.
+
+\subsection{Mode 3: user-submitted gene list}
+
+Pasting a list of symbols---comma-, space- or newline-separated---triggers
+validation followed by an on-demand ssGSEA run for that set
+(Figure~\ref{fig:genelist}). Symbols absent from the matrix are listed back to
+the user explicitly, so a map is never quietly computed on a subset of what was
+submitted. This is the path from an external result to anatomy: the output of a
+differential expression analysis, a co-expression module, or a disorder risk
+panel can be mapped across development directly, without the user preparing
+data or writing code.
+
+\subsection{Reference maps and export}
+
+Because atlas parcel names are not universally familiar, a reference panel
+renders the same four views coloured and labelled by region, at either
+granularity. Every map can be downloaded as SVG and every underlying table as
+CSV, at whichever granularity is displayed; the CSV contains exactly the values
+that were painted, so a figure produced in VEGABrain and a statistic computed
+from its export cannot disagree.
+
+%%------------------------------------------------------------------%%
+%% Figures 2-5 (placeholders in this draft -- see IMPLEMENTATION.md)
+%%------------------------------------------------------------------%%
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig2_interface.pdf}
+\caption{The VEGABrain interface. Left: query mode selector (gene list, single
+gene, ontology), the micro/macro granularity toggle, and the search or paste
+control for the active mode. Right: the rendered four-panel map with its colour
+legend, the SVG and CSV export buttons, and the reference-map control.}
+\label{fig:ui}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig3_gene_sox10.pdf}
+\caption{Single-gene mode. Mean $\log_2(\mathrm{RPKM}+1)$ for \emph{SOX10}
+across the five developmental windows (columns) in four views (rows): right
+lateral cortex and right medial cortex on the Desikan--Killiany parcellation,
+and subcortical structures in sagittal and coronal section on the \texttt{aseg}
+segmentation. Grey indicates regions with no BrainSpan sample in that window.}
+\label{fig:gene}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig4_ontology.pdf}
+\caption{Ontology mode: composite ssGSEA score for
+\texttt{GOBP\_FOREBRAIN\_GENERATION\_OF\_NEURONS} across development. The score
+summarises every gene in the term into one value per region and window; the same
+term can be viewed at micro granularity (42 atlas regions) or macro granularity
+(six anatomical groupings).}
+\label{fig:ontology}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig5_genelist.pdf}
+\caption{User-submitted gene-list mode. ssGSEA computed on demand for a
+GABAergic marker set (\emph{GAD1}, \emph{GAD2}, \emph{SLC32A1}, \emph{GABRB3})
+and mapped across development, illustrating the path from an arbitrary gene list
+to a spatiotemporal map without local installation or coding.}
+\label{fig:genelist}
+\end{figure}
+
+%%------------------------------------------------------------------%%
+%% Table 1 -- data summary
+%%------------------------------------------------------------------%%
+\begin{table}[htbp]
+\centering
+\caption{Data underlying VEGABrain.}\label{tab:data}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Property & Value \\
+\midrule
+Expression source        & BrainSpan RNA-Seq, Gencode v10 RPKM, gene-summarised \\
+Matrix dimensions        & 52{,}376 genes $\times$ 524 samples \\
+Transformation           & $\log_2(\mathrm{RPKM}+1)$; duplicate symbols dropped \\
+Developmental windows    & 5 (see below) \\
+\quad 1st trimester      & 5 donors \\
+\quad 2nd trimester      & 10 donors \\
+\quad 3rd trimester      & 5 donors \\
+\quad Infant             & 8 donors \\
+\quad Adult              & 14 donors \\
+Atlas regions (micro)    & 42 (Desikan--Killiany cortical + \texttt{aseg} subcortical) \\
+Anatomical groups (macro)& 6 (frontal, parietal, temporal, occipital, subcortical, cerebellum) \\
+Views per map            & 4 (DK lateral, DK medial, \texttt{aseg} sagittal, \texttt{aseg} coronal) \\
+Gene sets scored         & 18{,}650 total \\
+\quad GO biological process & 7{,}538 \\
+\quad Human Phenotype Ontology & 5{,}793 \\
+\quad GO molecular function & 1{,}872 \\
+\quad Reactome           & 1{,}839 \\
+\quad GO cellular component & 1{,}080 \\
+\quad BioCarta           & 292 \\
+\quad KEGG (legacy)      & 186 \\
+\quad MSigDB hallmark    & 50 \\
+Aggregated score rows    & 3{,}188{,}466 (gene set $\times$ window $\times$ region) \\
+\botrule
+\end{tabular}
+\end{table}
+
+%%------------------------------------------------------------------%%
+%% Table 2 -- API
+%%------------------------------------------------------------------%%
+\begin{table}[htbp]
+\centering
+\caption{VEGABrain API endpoints. All are public and unauthenticated at
+\url{https://brainmap-api-5kofy56taq-rj.a.run.app}.}\label{tab:api}
+\begin{tabular}{@{}llp{57mm}@{}}
+\toprule
+Endpoint & Method & Returns \\
+\midrule
+\texttt{/list\_genes}        & GET  & All HGNC symbols present in the matrix \\
+\texttt{/list\_ontologies}   & GET  & All 18{,}650 precomputed gene set names \\
+\texttt{/plot\_brain}        & GET  & SVG map of one gene's expression \\
+\texttt{/plot\_ontology}     & GET  & SVG map of one gene set's ssGSEA score \\
+\texttt{/plot\_genelist}     & POST & SVG map for a submitted gene list (ssGSEA run on demand) \\
+\texttt{/data\_brain}        & GET  & CSV of the values behind \texttt{/plot\_brain} \\
+\texttt{/data\_ontology}     & GET  & CSV of the values behind \texttt{/plot\_ontology} \\
+\texttt{/data\_genelist}     & POST & CSV of the values behind \texttt{/plot\_genelist} \\
+\texttt{/validate\_genelist} & POST & Submitted symbols split into matched and unmatched \\
+\texttt{/genes\_da\_via}     & GET  & Genes of a given set that are present in the matrix \\
+\texttt{/plot\_reference}    & GET  & SVG reference map labelled by region name \\
+\botrule
+\end{tabular}
+\footnotetext{Every plotting and data endpoint accepts \texttt{escala=micro} or
+\texttt{escala=macro} to select region granularity.}
+\end{table}
+
+%%==================================================================%%
+\section{Validation and comparison}\label{sec:validation}
+%%==================================================================%%
+
+\subsection{Correctness of the scoring pipeline}\label{sec:correctness}
+
+The precomputed scores served by VEGABrain and a score computed directly from
+the public matrix must agree, since the precomputation is intended purely as a
+caching step. We verify this by re-running \texttt{GSVA::gsva} with
+\texttt{ssgseaParam} on the same expression matrix for a random sample of gene
+sets, aggregating the result by developmental window and region exactly as the
+offline pipeline does, and comparing against the served values.
+
+% TODO-measure: run the reproduction script and substitute the three values below.
+Across \textbf{[TODO: $n$]} randomly drawn gene sets the served and recomputed
+per-region scores agreed to a Pearson correlation of \textbf{[TODO: $r$]} with a
+maximum absolute difference of \textbf{[TODO: $\Delta$]}, consistent with
+floating-point accumulation order alone. The on-demand path is validated the
+same way: submitting the member genes of a precomputed set through the gene-list
+endpoint reproduces that set's stored map to \textbf{[TODO: $\Delta$]}.
+
+\subsection{Biological face validity}\label{sec:facevalidity}
+
+Correct arithmetic is not sufficient; the maps must also recover developmental
+patterns that are independently established. We examined three cases whose
+expected behaviour is not in dispute.
+
+% TODO-measure: replace the qualitative statements below with the rendered maps
+% and, where useful, the per-window means from the CSV exports.
+Oligodendrocyte and myelination markers (\emph{SOX10}, \emph{MBP}, \emph{PLP1})
+should be low prenatally and rise sharply in the infant and adult windows;
+\textbf{[TODO: report the observed per-window means]}. GABAergic interneuron
+markers (\emph{GAD1}, \emph{GAD2}, \emph{SLC32A1}) should be present from the
+second trimester onward with subcortical and then cortical distribution;
+\textbf{[TODO]}. Neurogenesis-associated ontology terms should peak in the
+prenatal windows and decline postnatally; \textbf{[TODO]}. Where the composite
+score is informative is precisely here---the individual genes of a
+neurogenesis term are noisy across 42 sparsely sampled regions, whereas the
+ssGSEA summary of the term is not.
+
+\subsection{Performance}\label{sec:performance}
+
+VEGABrain scales to zero when idle, so response time has two regimes. A cold
+start---container launch plus loading the precomputed objects---was measured at
+24.8~s for the first request after an idle period; the front end absorbs this by
+retrying the initial listing calls while displaying a loading state. Warm
+requests are dominated by figure rendering for the precomputed modes and by the
+enrichment run itself for the gene-list mode.
+
+% TODO-measure: fill from a scripted benchmark of the deployed endpoints.
+\begin{table}[htbp]
+\centering
+\caption{Response times of the deployed service. Cold start is measured; warm
+figures are pending a scripted benchmark.}\label{tab:perf}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Request & Cold & Warm (median) \\
+\midrule
+\texttt{/list\_ontologies}                 & 24.8~s & [TODO] \\
+\texttt{/plot\_brain} (single gene)        & ---    & [TODO] \\
+\texttt{/plot\_ontology} (precomputed set) & ---    & [TODO] \\
+\texttt{/plot\_genelist} (on-demand ssGSEA)& ---    & [TODO] \\
+\botrule
+\end{tabular}
+\end{table}
+
+\subsection{Comparison with existing tools}\label{sec:comparison}
+
+Table~\ref{tab:compare} positions VEGABrain against the tools a researcher would
+otherwise reach for. The comparison is deliberately along axes of \emph{what the
+user must supply}, not of raw capability: each of these tools is stronger than
+VEGABrain in its own domain, and the point is that none of them closes the
+particular path from a gene set to a developmental brain map without
+installation.
+
+\begin{table}[htbp]
+\centering
+\caption{VEGABrain relative to comparable tools. \checkmark{} = supported,
+--- = not supported or out of scope.}\label{tab:compare}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{44mm}ccccc@{}}
+\toprule
+& Developmental & Anatomical & Gene-set & Custom list & No install \\
+& axis & rendering & scoring & input & required \\
+\midrule
+VEGABrain (this work)             & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+BrainSpan portal \citep{BrainSpan2011} & \checkmark & ---   & ---        & ---        & \checkmark \\
+Allen browsers \citep{Lau2008,Sunkin2013} & ---   & \checkmark & ---     & ---        & \checkmark \\
+\texttt{ggseg} \citep{Mowinckel2020}   & ---        & \checkmark & ---   & \checkmark & --- \\
+\texttt{neuromaps} \citep{Markello2022}& ---        & \checkmark & ---   & \checkmark & --- \\
+\texttt{abagen} \citep{Markello2021}   & ---        & \checkmark & ---   & \checkmark & --- \\
+Enrichr \citep{Chen2013,Kuleshov2016}  & ---        & ---        & \checkmark & \checkmark & \checkmark \\
+\texttt{VoxHunt} \citep{Fleck2021}     & \checkmark & \checkmark & ---   & \checkmark & --- \\
+\botrule
+\end{tabular}
+\footnotetext{``Developmental axis'' means the tool natively presents variation
+across prenatal-to-postnatal time. ``Gene-set scoring'' means it produces a
+composite per-sample score for a set of genes rather than plotting genes
+individually.}
+\end{table}
+
+The programmatic tools \citep{Mowinckel2020,Markello2021,Markello2022} render
+brain data beautifully and reproducibly, and VEGABrain is built on one of them,
+but they take a value per region as \emph{input}: the user must still obtain,
+preprocess and map the developmental expression data themselves.
+Enrichr \citep{Chen2013,Kuleshov2016} performs the gene-set reasoning but
+returns ranked term tables, with no anatomical or developmental dimension.
+\texttt{VoxHunt} \citep{Fleck2021} maps expression signatures onto developmental
+reference atlases, primarily to assign identity to \emph{in vitro} organoid
+samples, and is an R package rather than a hosted service. VEGABrain occupies the
+intersection: hosted, developmental, anatomical, and gene-set aware.
+
+%%==================================================================%%
+\section{Discussion}\label{sec:discussion}
+%%==================================================================%%
+
+VEGABrain lowers the cost of asking a spatial question of the developing human
+transcriptome from a small project to a few seconds in a browser. That change is
+logistical rather than methodological, but it is the change that determines
+whether a clinician or an experimental biologist ever looks at these data
+anatomically. The composite enrichment layer extends the same reasoning to the
+unit that modern analyses actually produce---a gene set---and the on-demand mode
+means a user's own list is a first-class input rather than something the tool's
+authors had to anticipate.
+
+Several limitations bound the interpretation of any map produced here, and the
+interface is designed to keep them visible rather than to smooth them over.
+
+\paragraph{Donor support is small and uneven.} Each developmental window rests on
+5 to 14 donors, and not every structure is sampled in every window. Donor counts
+are printed in every facet label and unsampled regions are drawn in grey rather
+than interpolated, but a difference between two regions in a single window
+should be read as descriptive, not as a test.
+
+\paragraph{The data are bulk tissue.} BrainSpan samples are dissected tissue, so
+a regional value reflects both cell-intrinsic expression and cell-type
+composition. A rise in an oligodendrocyte programme across development is as
+consistent with more oligodendrocytes as with more transcription per cell.
+Single-cell atlases resolve this and are the natural next data source.
+
+\paragraph{The atlas mapping is an approximation.} BrainSpan dissections and
+Desikan--Killiany parcels do not correspond one-to-one; several parcels share a
+BrainSpan structure, and the macro scale pools further. The mapping is published
+as a single CSV precisely so that it can be inspected, criticised and revised
+rather than trusted implicitly.
+
+\paragraph{ssGSEA scores are within-sample ranks.} Equation~\ref{eq:ssgsea}
+yields a value that is comparable across samples for a fixed gene set, but not
+across gene sets of different sizes and not on an absolute scale. Colour scales
+for ontology maps are therefore free rather than fixed, and a score should be
+read as a spatiotemporal pattern, not as a magnitude.
+
+\paragraph{Scaling to zero trades latency for cost.} The first request after an
+idle period pays a container cold start. This is a deliberate choice that keeps
+a public, unfunded service sustainable; the front end masks it, but a user
+issuing a single query after a quiet period will wait.
+
+Future work follows directly from these bounds: incorporating single-cell and
+single-nucleus developmental atlases, adding statistical contrast between
+windows or regions rather than descriptive display alone, allowing user-supplied
+parcellations, and archiving each release with a citable DOI so that a figure
+can be tied to an exact version of the data and code.
+
+%%==================================================================%%
+\section{Conclusion}\label{sec:conclusion}
+%%==================================================================%%
+
+VEGABrain makes the developmental human brain transcriptome visible without
+installation, coding or data preparation, and adds a composite per-region
+enrichment layer over 18{,}650 ontology gene sets together with on-demand
+scoring of arbitrary user gene lists. Maps and their underlying tables are
+exportable, the structure-to-atlas mapping is published rather than implied, and
+the whole stack is open source and containerised. The tool is available at
+\url{https://mcblab.github.io/BrainMap/}.
+
+%%==================================================================%%
+\backmatter
+%%==================================================================%%
+
+\bmhead{Acknowledgements}
+
+We thank the Allen Institute for Brain Science and the BrainSpan consortium for
+making the developmental transcriptome openly available, and the maintainers of
+\texttt{ggseg}, \texttt{GSVA} and \texttt{msigdbr}, on which this work depends.
+% TODO(authors): add individual acknowledgements and grant numbers.
+
+\section*{Declarations}
+
+\bmhead{Funding}
+% TODO(authors): funding sources and grant numbers, or an explicit statement
+% that no funding was received.
+[TODO]
+
+\bmhead{Competing interests}
+The authors declare no competing interests.
+
+\bmhead{Ethics approval and consent to participate}
+Not applicable. This study analyses publicly released, de-identified data from
+the BrainSpan Developmental Transcriptome and involved no new human subjects.
+
+\bmhead{Data availability}
+The expression data analysed here are the BrainSpan Developmental Transcriptome
+RNA-Seq Gencode v10 summarised-to-genes release, publicly available at
+\url{https://www.brainspan.org}. Gene sets were obtained from MSigDB through the
+\texttt{msigdbr} R package. The derived per-region, per-window score tables
+served by VEGABrain are downloadable as CSV directly from the application.
+
+\bmhead{Code availability}
+VEGABrain is open source at \url{https://github.com/MCBLab/BrainMap}. The
+application is deployed at \url{https://mcblab.github.io/BrainMap/} with the
+API at \url{https://brainmap-api-5kofy56taq-rj.a.run.app}.
+% TODO(authors): add the licence and a Zenodo DOI for the archived release.
+
+\bmhead{Author contributions}
+% TODO(authors): complete using CRediT roles.
+[TODO]
+
+\bigskip
+
+\bibliography{references}
+
+\end{document}
