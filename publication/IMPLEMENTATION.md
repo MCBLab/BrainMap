@@ -160,15 +160,16 @@ swapping them in requires no edit to `main.tex`.
 
 ## 6. Reference ledger
 
-34 entries in `references.bib`; 20 have the full text archived in
+37 entries in `references.bib`; 23 have the full text archived in
 `references/<Key>.pdf`. Bib key ⇄ filename is 1:1 (`Zhu2019.pdf` was renamed to
 `Zhu2018.pdf` and `mowinckel2020.pdf` to `Mowinckel2020.pdf` to keep it so).
 
-**Archived locally (20):** `Chen2013`, `Chopra2023`, `GOConsortium2023`,
-`Gillespie2022`, `Hanzelmann2013`, `Kanehisa2000`, `Kohler2021`, `Kuleshov2016`,
-`Lau2008`, `Li2018`, `Liberzon2011`, `Liberzon2015`, `Markello2021`,
-`Markello2022`, `Mowinckel2020`, `Subramanian2005`, `Sunkin2013`,
-`Wilkinson2016`, `Yi2020`, `Zhu2018`.
+**Archived locally (23):** `Bahl2017`, `Cao2023`, `Chen2013`, `Chopra2023`,
+`GOConsortium2023`, `Gillespie2022`, `Hanzelmann2013`, `Huisman2017`,
+`Kanehisa2000`, `Kohler2021`, `Kuleshov2016`, `Lau2008`, `Li2018`,
+`Liberzon2011`, `Liberzon2015`, `Markello2021`, `Markello2022`,
+`Mowinckel2020`, `Subramanian2005`, `Sunkin2013`, `Wilkinson2016`, `Yi2020`,
+`Zhu2018`.
 
 **No local PDF (14)** — cited on verified Crossref metadata; no open-access copy
 was retrievable:
