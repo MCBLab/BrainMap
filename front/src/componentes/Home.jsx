@@ -5,6 +5,42 @@ import Select from 'react-select';
 // para o Cloud Run). O fallback mantem o desenvolvimento local funcionando.
 const API = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:33857').replace(/\/$/, '');
 
+// A entrada padrao da aba Gene List e um gene por linha, opcionalmente seguido
+// do log2FC ("SOX10  2.41"). Com log2FC a API troca o ssGSEA por um score
+// ponderado; sem ele o comportamento continua o de sempre.
+const GENES_EXEMPLO = ['SOX10', 'TSPAN6', 'SCYL3', 'GABRB3', 'GAD1', 'GAD2', 'SLC32A1'];
+
+const ASSINATURA_EXEMPLO = [
+  ['SOX10', 2.41], ['TSPAN6', -1.87], ['SCYL3', 0.92], ['GABRB3', -2.15],
+  ['GAD1', 3.02], ['GAD2', 2.58], ['SLC32A1', -0.55],
+];
+
+// Espelha parse_assinatura() do plumber.R, mas so para exibicao (rotulo do
+// historico); quem pontua de fato e a API. Se as duas regras divergirem, a
+// tela mente sobre o que foi enviado.
+const parseAssinatura = (texto) => {
+  const divide = (linha) => linha.split(/[ \t,;]+/).filter(Boolean);
+  const linhas = (texto || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  // Cabecalho de export do DESeq2/edgeR/limma ("gene,log2FoldChange")
+  const primeiro = linhas.length ? divide(linhas[0]) : [];
+  if (primeiro.length >= 2 && /^(gene|genes|symbol|id)$/i.test(primeiro[0])
+      && !Number.isFinite(Number(primeiro[1]))) {
+    linhas.shift();
+  }
+
+  return linhas.flatMap((linha) => {
+    const tokens = divide(linha);
+    if (tokens.length === 2 && Number.isFinite(Number(tokens[1]))) {
+      return [{ gene: tokens[0], peso: Number(tokens[1]), tinhaPeso: true }];
+    }
+    // Um simbolo so, ou varios sem numero nenhum: lista simples.
+    return tokens.map((gene) => ({ gene, peso: 1, tinhaPeso: false }));
+  });
+};
+
+const separarGenes = (texto) => parseAssinatura(texto).map((g) => g.gene);
+
 export default function Home() {
   const [abaAtual, setAbaAtual] = useState('genelist');
   const [escalaRegiao, setEscalaRegiao] = useState('micro');
@@ -21,6 +57,7 @@ export default function Home() {
   const [historicoOntology, setHistoricoOntology] = useState([]);
   const [historicoGenelist, setHistoricoGenelist] = useState([]);
   const [genesInvalidos, setGenesInvalidos] = useState([]);
+  const [infoAssinatura, setInfoAssinatura] = useState(null);
   const [mostrarModalGenes, setMostrarModalGenes] = useState(false);
 
   const [genesDaVia, setGenesDaVia] = useState([]);
@@ -96,6 +133,7 @@ export default function Home() {
 
     // 1. Limpa o aviso da pesquisa anterior para não acumular
     setGenesInvalidos([]);
+    setInfoAssinatura(null);
     setMostrarModalGenes(false);
 
     try {
@@ -113,9 +151,26 @@ export default function Home() {
       const listaInvalidos = Array.isArray(dadosValidacao.invalidos) ? dadosValidacao.invalidos : dadosValidacao.invalidos?.[0] || [];
       const listaValidos = Array.isArray(dadosValidacao.validos) ? dadosValidacao.validos : dadosValidacao.validos?.[0] || [];
 
+      // Escalares vem desembrulhados da API atual, mas uma versao mais antiga
+      // no Cloud Run ainda manda [false] / [3].
+      const desembrulha = (v) => (Array.isArray(v) ? v[0] : v);
+      const ponderado = Boolean(desembrulha(dadosValidacao.ponderado));
+      const nUp = Number(desembrulha(dadosValidacao.n_up)) || 0;
+      const nDown = Number(desembrulha(dadosValidacao.n_down)) || 0;
+      const nSemPeso = Number(desembrulha(dadosValidacao.n_sem_peso)) || 0;
+      setInfoAssinatura(ponderado ? { nUp, nDown, nSemPeso } : null);
+
       // Se houver algum erro, salva no Estado (Isso faz a caixa amarela aparecer!)
       if (listaInvalidos.length > 0) {
         setGenesInvalidos(listaInvalidos); 
+      }
+
+      // Sem nenhum log2FC diferente de zero nao ha o que ponderar, e o erro da
+      // API voltaria como um 500 generico.
+      if (ponderado && nUp === 0 && nDown === 0) {
+        alert("Todos os log2FC informados são zero — não há nada para ponderar.");
+        setCarregandoImagem(false);
+        return;
       }
 
       // Se TUDO estiver errado, para por aqui e avisa
@@ -288,12 +343,21 @@ export default function Home() {
 
               {/* SÓ MOSTRA O BOTÃO SE ESTIVER NA ABA GENELIST */}
               {abaAtual === 'genelist' && (
-                <button
-                  onClick={() => setTextoListaGenes("SOX10, TSPAN6, SCYL3, GABRB3, GAD1, GAD2, SLC32A1")}
-                  className="text-[10px] text-zinc-500 hover:text-[#58614c] font-bold underline transition-colors"
-                >
-                  Use example data
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setTextoListaGenes(GENES_EXEMPLO.join("\n"))}
+                    className="text-[10px] text-zinc-500 hover:text-[#58614c] font-bold underline transition-colors"
+                  >
+                    Example list
+                  </button>
+                  <button
+                    onClick={() => setTextoListaGenes(
+                      ASSINATURA_EXEMPLO.map(([gene, fc]) => `${gene}\t${fc}`).join("\n"))}
+                    className="text-[10px] text-zinc-500 hover:text-[#58614c] font-bold underline transition-colors"
+                  >
+                    Example with log2FC
+                  </button>
+                </div>
               )}
             </div>
 
@@ -362,15 +426,29 @@ export default function Home() {
                   rows="6" 
                   value={textoListaGenes}
                   onChange={(e) => setTextoListaGenes(e.target.value)}
-                  placeholder="Cole sua lista de genes aqui..." 
-                  className="w-full px-4 py-3 bg-white border border-transparent focus:border-[#58614c] rounded-lg text-sm outline-none resize-none"
+                  placeholder={"SOX10\nTSPAN6\nGAD1"} 
+                  className="w-full px-4 py-3 bg-white border border-transparent focus:border-[#58614c] rounded-lg text-sm font-mono outline-none resize-y"
                 ></textarea>
                 <button 
                   onClick={gerarMapaLista}
                   className="w-full mt-4 bg-[#58614c] text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all"
                 >
-                  Renderizar Mapa
+                  Generate Plot
                 </button>
+
+                {/* Unica confirmacao na tela de que os log2FC foram lidos: sem
+                    isso um erro de formato vira um mapa nao ponderado silencioso. */}
+                {infoAssinatura && (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] bg-[#e9edf5] border border-[#c9d4e8] text-[#2f3f66] rounded-lg px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Weighted</span>
+                    <span>{infoAssinatura.nUp} up / {infoAssinatura.nDown} down</span>
+                    {infoAssinatura.nSemPeso > 0 && (
+                      <span className="text-[#8c6d1f]">
+                        · {infoAssinatura.nSemPeso} without log2FC (counted as +1)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -387,7 +465,10 @@ export default function Home() {
                       className="bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-600 text-[11px] font-medium px-3 py-1.5 rounded-full transition-colors max-w-full truncate"
                       title={termo}
                     >
-                      {termo.length > 25 ? termo.substring(0, 25) + '...' : termo}
+                      {(() => {
+                        const rotulo = separarGenes(termo).join(', ');
+                        return rotulo.length > 25 ? rotulo.substring(0, 25) + '...' : rotulo;
+                      })()}
                     </button>
                   ))}
                 </div>

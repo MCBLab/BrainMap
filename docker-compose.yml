@@ -3,8 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    environment:
+      # Mesma variavel que o Cloud Run injeta; 8080 e o default do Dockerfile.api.
+      PORT: 8080
     ports:
-      - "33857:33857"
+      # Host 33857 (default do front) -> porta 8080 do container.
+      - "33857:8080"
     restart: unless-stopped
     develop:
       watch:
@@ -27,3 +31,6 @@ services:
           target: /app
           ignore:
             - node_modules/
+        # Mudou dependencia -> sync nao basta, precisa refazer o npm install.
+        - action: rebuild
+          path: ./front/package.json
