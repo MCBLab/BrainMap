@@ -312,11 +312,12 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
 
 # 3. ENDPOINTS DE PLOTAGEM (SINTAXE OFICIAL MODERNA DO GGSEG)
 
-#* Retorna o plot do cérebro com a expressão do gene selecionado
-#* @param gene Nome do gene selecionado no front-end
-#* @serializer svg list(width = 11, height = 7)
-#* @get /plot_brain
-function(gene = "SOX10", escala = "micro") {
+# Cada mapa e servido em dois formatos: SVG (vetorial, para publicacao) e PNG
+# (o que a tela exibe - o SVG do ggseg carrega milhares de poligonos e pesa no
+# navegador). O calculo fica nas funcoes grafico_*, e cada endpoint so escolhe
+# o device do serializer, para que os dois formatos nunca divirjam.
+
+grafico_gene <- function(gene = "SOX10", escala = "micro") {
   if (!(gene %in% rownames(matrix_dados))) stop("Erro: Gene não encontrado.")
 
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
@@ -349,15 +350,26 @@ function(gene = "SOX10", escala = "micro") {
     values = scales::rescale(c(0, 1.5, 3, 4.5, 6)),limits = c(0, 6), 
     name = "Log2 Expr", na.value = "darkgray")  
 
-  plots_brain <- build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
-  print(plots_brain)
+  build_brain_grid(dados_gene_plot, "Expressao_Media", escala)
 }
 
-#* Plota o mapa cerebral baseado no Score ssGSEA de uma ONTOLOGIA
-#* @param geneset A ontologia selecionada
+#* Retorna o plot do cérebro com a expressão do gene selecionado (SVG)
+#* @param gene Nome do gene selecionado no front-end
 #* @serializer svg list(width = 11, height = 7)
-#* @get /plot_ontology
-function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
+#* @get /plot_brain
+function(gene = "SOX10", escala = "micro") {
+  print(grafico_gene(gene, escala))
+}
+
+#* Mesmo mapa do /plot_brain, em PNG
+#* @param gene Nome do gene selecionado no front-end
+#* @serializer png list(width = 11, height = 7, units = "in", res = 150)
+#* @get /plot_brain_png
+function(gene = "SOX10", escala = "micro") {
+  print(grafico_gene(gene, escala))
+}
+
+grafico_ontologia <- function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
 
   dados_prontos <- scores_ontologia(geneset, escala)
@@ -371,15 +383,26 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
     #values = scales::rescale(c(0, 2, 4, 6, 8)),limits = c(0, 8),
     name = "ssGSEA Score", na.value = "darkgray")
 
-  p <- build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala_cor)
-  print(p)
+  build_brain_grid(dados_prontos, "Score_Medio_ssGSEA", escala_cor)
 }
 
-#* Plota o mapa cerebral baseado no ssGSEA de uma lista CUSTOMIZADA de genes
-#* @param gene_string Uma string de genes
+#* Plota o mapa cerebral baseado no Score ssGSEA de uma ONTOLOGIA (SVG)
+#* @param geneset A ontologia selecionada
 #* @serializer svg list(width = 11, height = 7)
-#* @post /plot_genelist
-function(gene_string = "", escala = "micro") {
+#* @get /plot_ontology
+function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
+  print(grafico_ontologia(geneset, escala))
+}
+
+#* Mesmo mapa do /plot_ontology, em PNG
+#* @param geneset A ontologia selecionada
+#* @serializer png list(width = 11, height = 7, units = "in", res = 150)
+#* @get /plot_ontology_png
+function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
+  print(grafico_ontologia(geneset, escala))
+}
+
+grafico_genelist <- function(gene_string = "", escala = "micro") {
   assinatura <- assinatura_valida(gene_string)
   resultado <- scores_assinatura(assinatura, escala)
 
@@ -402,7 +425,7 @@ function(gene_string = "", escala = "micro") {
       guides(fill = guide_colorbar(barwidth = unit(5, "cm")))
     )
 
-    # Um SVG ponderado e um nao ponderado sao indistinguiveis depois de
+    # Um mapa ponderado e um nao ponderado sao indistinguiveis depois de
     # baixados; a legenda carimba o metodo e a composicao da assinatura.
     legenda <- sprintf("Weighted signature - %d genes (%d up / %d down)",
                        nrow(assinatura$validos), assinatura$n_up, assinatura$n_down)
@@ -418,8 +441,23 @@ function(gene_string = "", escala = "micro") {
     legenda <- NULL
   }
 
-  p <- build_brain_grid(resultado$dados, resultado$coluna, escala_cor, legenda)
-  print(p)
+  build_brain_grid(resultado$dados, resultado$coluna, escala_cor, legenda)
+}
+
+#* Plota o mapa cerebral baseado no ssGSEA de uma lista CUSTOMIZADA de genes (SVG)
+#* @param gene_string Uma string de genes
+#* @serializer svg list(width = 11, height = 7)
+#* @post /plot_genelist
+function(gene_string = "", escala = "micro") {
+  print(grafico_genelist(gene_string, escala))
+}
+
+#* Mesmo mapa do /plot_genelist, em PNG
+#* @param gene_string Uma string de genes
+#* @serializer png list(width = 11, height = 7, units = "in", res = 150)
+#* @post /plot_genelist_png
+function(gene_string = "", escala = "micro") {
+  print(grafico_genelist(gene_string, escala))
 }
 
 #* Baixar dados do mapa de Gene Único
