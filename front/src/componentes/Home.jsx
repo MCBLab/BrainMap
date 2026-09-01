@@ -64,6 +64,8 @@ export default function Home() {
   const [mostrarGenesDaVia, setMostrarGenesDaVia] = useState(false);
   const [carregandoGenesVia, setCarregandoGenesVia] = useState(false);
 
+  const [baixandoPlot, setBaixandoPlot] = useState(null);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [abaMapaRef, setAbaMapaRef] = useState('lateral');
   const [escalaMapaRef, setEscalaMapaRef] = useState('micro');
@@ -181,7 +183,7 @@ export default function Home() {
       }
 
       // 3. GERAÇÃO DA IMAGEM
-      const resposta = await fetch(`${API}/plot_genelist`, {
+      const resposta = await fetch(`${API}/plot_genelist_png`, {
         method: 'POST', body: params
       });
       if (!resposta.ok) throw new Error("Erro");
@@ -207,29 +209,62 @@ export default function Home() {
     }
   };
 
+  // Os endpoints _png devolvem o mesmo mapa em bitmap. A tela usa o PNG (o SVG
+  // do ggseg traz milhares de poligonos e pesa no navegador); o SVG continua
+  // inteiro no botao de download, que e o que vai para a publicacao.
+  const endpointPlot = (formato) => {
+    const sufixo = formato === 'png' ? '_png' : '';
+    if (abaAtual === 'gene') {
+      return `${API}/plot_brain${sufixo}?gene=${encodeURIComponent(selecionada.value)}&escala=${escalaRegiao}`;
+    }
+    if (abaAtual === 'ontology') {
+      return `${API}/plot_ontology${sufixo}?geneset=${encodeURIComponent(selecionada.value)}&escala=${escalaRegiao}`;
+    }
+    return `${API}/plot_genelist${sufixo}`;
+  };
+
   let urlImagem = '';
   if (abaAtual === 'genelist' && imagemCustomizada) {
     urlImagem = imagemCustomizada;
   } else if (selecionada && abaAtual !== 'genelist') {
-    urlImagem = abaAtual === 'gene' 
-      ? `${API}/plot_brain?gene=${selecionada.value}&escala=${escalaRegiao}`
-      : `${API}/plot_ontology?geneset=${selecionada.value}&escala=${escalaRegiao}`;
+    urlImagem = endpointPlot('png');
   }
 
 
-  const baixarSVG = async () => {
-    if (!urlImagem) return;
+  const baixarPlot = async (formato) => {
+    if (!urlImagem || baixandoPlot) return;
+    setBaixandoPlot(formato);
+    // O PNG da aba Gene List ja esta na tela: refazer o POST custaria outro
+    // ssGSEA inteiro so para produzir o mesmo arquivo.
+    const jaBaixado = formato === 'png' && abaAtual === 'genelist' && imagemCustomizada;
     try {
-      const response = await fetch(urlImagem);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      let url = imagemCustomizada;
+
+      if (!jaBaixado) {
+        const opcoesFetch = {};
+        if (abaAtual === 'genelist') {
+          const params = new URLSearchParams();
+          params.append('gene_string', textoListaGenes);
+          params.append('escala', escalaRegiao);
+          opcoesFetch.method = 'POST';
+          opcoesFetch.body = params;
+        }
+
+        const response = await fetch(endpointPlot(formato), opcoesFetch);
+        if (!response.ok) throw new Error("Erro");
+        url = URL.createObjectURL(await response.blob());
+      }
+
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Mapa_${abaAtual}.svg`;
+      a.download = `Mapa_${abaAtual}.${formato}`;
       a.click();
-      URL.revokeObjectURL(url);
+      // Revogar o blob da aba Gene List apagaria a imagem que esta na tela.
+      if (!jaBaixado) URL.revokeObjectURL(url);
     } catch (err) {
-      alert("Erro ao tentar baixar o SVG.");
+      alert(`Erro ao tentar baixar o ${formato.toUpperCase()}.`);
+    } finally {
+      setBaixandoPlot(null);
     }
   };
 
@@ -540,10 +575,18 @@ export default function Home() {
                 📊 Download Data (CSV)
               </button>
               <button 
-                onClick={baixarSVG}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[#58614c] text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-sm transition-all"
+                onClick={() => baixarPlot('svg')}
+                disabled={baixandoPlot !== null}
+                className="flex items-center gap-2 px-6 py-2.5 bg-[#58614c] text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-sm transition-all disabled:opacity-60 disabled:cursor-wait"
               >
-                🖼️ Download Plot (SVG)
+                {baixandoPlot === 'svg' ? '⏳ Gerando SVG...' : '🖼️ Download Plot (SVG)'}
+              </button>
+              <button 
+                onClick={() => baixarPlot('png')}
+                disabled={baixandoPlot !== null}
+                className="flex items-center gap-2 px-6 py-2.5 bg-[#58614c] text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:opacity-90 shadow-sm transition-all disabled:opacity-60 disabled:cursor-wait"
+              >
+                {baixandoPlot === 'png' ? '⏳ Gerando PNG...' : '🖼️ Download Plot (PNG)'}
               </button>
             </div>
           )}
