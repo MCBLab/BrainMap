@@ -63,18 +63,9 @@ developing human brain}
 %% Abstract
 %%==================================================================%%
 
-\abstract{RNA-seq datasets are widely reused resources in developmental neuroscience, 
-yet exploring their spatial organization remains difficult. Here, we present VEGABrain, 
-an openly accessible web tool that renders bulk RNA-seq onto cortical and subcortical 
-brain atlas surfaces across five human developmental windows spanning the first trimester 
-to adulthood. Beyond single-gene maps, VEGABrain introduces a composite per-region enrichment 
-layer based on precomputed single-sample gene set enrichment analysis (ssGSEA) scores for ~19,000 
-gene sets from Gene Ontology, Reactome, KEGG, BioCarta, the Human Phenotype Ontology, and 
-the MSigDB Hallmark collection, aggregated into enrichment scores for every gene set, 
-developmental window, and brain region. Users can also submit custom gene lists to generate 
-ssGSEA-based spatial maps across development on demand. VEGABrain is distributed as a 
-containerized R API with an intuitive web interface, providing an easy-to-query resource 
-for exploring spatiotemporal gene expression in the developing human brain.}
+\abstract{
+  RNA sequencing datasets are widely reused resource in developmental neuroscience, yet inspecting it spatially remains unclear and difficult. Here, we present VEGABrain, an openly accessible web tool that renders bulk RNA-seq onto brain cortical and subcortical atlas surfaces across five human developmental windows spanning the first trimester to adulthood. Beyond single-gene maps, VEGABrain contributes a composite per-region enrichment layer using single-sample gene set enrichment analysis (ssGSEA) scores from precomputed for ~19000 gene sets drawn from Gene Ontology, Reactome, KEGG, BioCarta, the Human Phenotype Ontology and the MSigDB hallmark collection, and aggregated to a score for every gene set, developmental window and brain region. Furthermore, VEGABrain allows users to submit a custom gene list and obtain its ssGSEA map across development, computed on demand. Therefore, VEGABrain serves as a containerised R API offering easy to query expression throughout development and brain areas.
+}
 
 \keywords{Neuroinformatics, Brain development, BrainSpan, Gene set enrichment,
 ssGSEA, Data visualization, Web application}
@@ -91,9 +82,7 @@ reused datasets in neuroscience. The BrainSpan atlas
 subcortical structures across prenatal and postnatal donors, and subsequent
 integrative work built on it to relate developmental expression to
 neuropsychiatric risk \citep{Li2018} and to evolutionary divergence between
-human and macaque \citep{Zhu2018}.
-
-What has not kept pace is the ease of \emph{seeing} it. A researcher who wants
+human and macaque \citep{Zhu2018}. A researcher who wants
 to know where and when a gene, or a set of genes, is expressed in the developing
 brain has essentially two options today, and both impose costs that are
 unrelated to the biological question.
@@ -108,11 +97,23 @@ the way a rendered cortex does. It is also gene-at-a-time. There is no route
 from a gene set, a pathway, or the output of a differential-expression analysis
 to a spatial view.
 
+One portal in this family goes considerably further. BrainScope
+\citep{Huisman2017} places the Allen adult and developing atlases behind an
+interactive interface and does accept a user-supplied gene set. Its organising
+abstraction, however, is a pair of linked t-SNE maps---one of genes, one of
+samples---in which anatomy is recovered indirectly, through choropleths over
+user-selected slices that localise the samples; a submitted set is summarised by
+its mean expression, and functional interpretation is handed off to external
+enrichment servers. The spatial question it answers is thus one of similarity
+structure among samples rather than of position in a named parcellation, and it
+is answered without a composite enrichment score.
+
 The second option is to do it yourself. Excellent programmatic brain-plotting
 tools exist---\texttt{ggseg} and \texttt{ggseg3d} in R
 \citep{Mowinckel2020}, \texttt{neuromaps} in Python \citep{Markello2022}, and
 \texttt{abagen} for the adult Allen Human Brain Atlas
-\citep{Hawrylycz2012,Markello2021}---and
+\citep{Hawrylycz2012,Markello2021}, and \texttt{cerebroViz} for region-level
+spatiotemporal data \citep{Bahl2017}---and
 the case for producing figures programmatically rather than through graphical
 interfaces has been made convincingly \citep{Chopra2023}: it is reproducible,
 scriptable and version-controllable. But that route presupposes a user who
@@ -445,10 +446,18 @@ term can be viewed at micro granularity (42 atlas regions) or macro granularity
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{fig5_genelist.pdf}
-\caption{User-submitted gene-list mode. ssGSEA computed on demand for a
-GABAergic marker set (\emph{GAD1}, \emph{GAD2}, \emph{SLC32A1}, \emph{GABRB3})
-and mapped across development, illustrating the path from an arbitrary gene list
-to a spatiotemporal map without local installation or coding.}
+\caption{User-submitted gene-list mode. ssGSEA computed on demand for the
+dorsal/glutamatergic specification programme that \citet{Fischer2021} report as
+upregulated by chronic intermittent ethanol exposure in human pluripotent stem
+cells differentiated to first-trimester-equivalent cortical neurons
+(\emph{EMX2}, \emph{LHX1/2/5/9}, \emph{OTX2}, \emph{FEZF2},
+\emph{NEUROD1/2/6}, \emph{NEUROG2}, \emph{TBR1}, \emph{EOMES}). The submitted
+list is a published differential-expression result, not a curated marker panel,
+and it is mapped without local installation or coding. The score is highest in
+the cortical parcels of the first two prenatal windows---the period the
+\emph{in vitro} model corresponds to---and falls monotonically thereafter,
+while the striatum stays low throughout, recovering the dorsal--ventral
+contrast the signature encodes.}
 \label{fig:genelist}
 \end{figure}
 
@@ -556,6 +565,20 @@ score is informative is precisely here---the individual genes of a
 neurogenesis term are noisy across 42 sparsely sampled regions, whereas the
 ssGSEA summary of the term is not.
 
+A fourth case tests the on-demand path against a model whose developmental
+timing is experimentally fixed rather than merely presumed.
+\citet{Fischer2021} exposed human pluripotent stem cells to chronic
+intermittent ethanol throughout a 50-day differentiation to cortical neurons,
+which corresponds to the first trimester, and report an upregulated
+dorsal/glutamatergic specification programme. Submitting those 13 symbols
+(Figure~\ref{fig:genelist}) through the gene-list endpoint returns a map whose
+region-averaged score declines monotonically across the five windows---0.81,
+0.74, 0.58, 0.47, 0.44---so the signature is maximal in exactly the window the
+\emph{in vitro} model represents, and the ordering is recovered from BrainSpan
+alone, with no information from the original experiment. Because the exposure
+window is part of the experimental design, this is a stronger test than a
+disease with a merely prenatal attribution.
+
 \subsection{Performance}\label{sec:performance}
 
 VEGABrain scales to zero when idle, so response time has two regimes. A cold
@@ -588,8 +611,8 @@ Table~\ref{tab:compare} positions VEGABrain against the tools a researcher would
 otherwise reach for. The comparison is deliberately along axes of \emph{what the
 user must supply}, not of raw capability: each of these tools is stronger than
 VEGABrain in its own domain, and the point is that none of them closes the
-particular path from a gene set to a developmental brain map without
-installation.
+particular path VEGABrain is built for---from a gene set to a scored,
+parcellated map of the developing brain, in a browser.
 
 \begin{table}[htbp]
 \centering
@@ -605,29 +628,67 @@ installation.
 VEGABrain (this work)             & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
 BrainSpan portal \citep{BrainSpan2011} & \checkmark & ---   & ---        & ---        & \checkmark \\
 Allen browsers \citep{Lau2008,Sunkin2013} & ---   & \checkmark & ---     & ---        & \checkmark \\
+BrainScope \citep{Huisman2017}         & \checkmark & \checkmark & ---   & \checkmark & \checkmark \\
+SMDB \citep{Cao2023}                   & ---        & \checkmark & ---   & ---        & \checkmark \\
 \texttt{ggseg} \citep{Mowinckel2020}   & ---        & \checkmark & ---   & \checkmark & --- \\
 \texttt{neuromaps} \citep{Markello2022}& ---        & \checkmark & ---   & \checkmark & --- \\
 \texttt{abagen} \citep{Markello2021}   & ---        & \checkmark & ---   & \checkmark & --- \\
+\texttt{cerebroViz} \citep{Bahl2017}   & \checkmark & \checkmark & ---   & \checkmark & --- \\
+Programmatic plotting guides \citep{Chopra2023} & --- & \checkmark & --- & \checkmark & --- \\
 Enrichr \citep{Chen2013,Kuleshov2016}  & ---        & ---        & \checkmark & \checkmark & \checkmark \\
 \texttt{VoxHunt} \citep{Fleck2021}     & \checkmark & \checkmark & ---   & \checkmark & --- \\
 \botrule
 \end{tabular}
 \footnotetext{``Developmental axis'' means the tool natively presents variation
-across prenatal-to-postnatal time. ``Gene-set scoring'' means it produces a
-composite per-sample score for a set of genes rather than plotting genes
-individually.}
+across prenatal-to-postnatal time. ``Anatomical rendering'' means values are
+drawn onto a picture of the brain, in whatever form the tool adopts---a
+parcellated surface, a slice choropleth or a three-dimensional point cloud.
+``Gene-set scoring'' means it produces a composite per-sample score for a set of
+genes rather than plotting genes individually; a tool that displays the mean
+expression of a set, or that hands the set to an external enrichment server,
+does not qualify. ``Custom list input'' means the user may supply their own
+genes or their own per-region values.}
 \end{table}
 
 The programmatic tools \citep{Mowinckel2020,Markello2021,Markello2022} render
 brain data beautifully and reproducibly, and VEGABrain is built on one of them,
 but they take a value per region as \emph{input}: the user must still obtain,
 preprocess and map the developmental expression data themselves.
+\texttt{cerebroViz} \citep{Bahl2017} is the closest of them in intent, having
+been written for spatiotemporal brain data specifically and shipping region
+vocabularies for BrainSpan, GTEx and Roadmap Epigenomics; it nonetheless remains
+a drawing layer over a matrix the user provides, carries no expression data of
+its own, and computes no enrichment. The same qualification applies to the
+code-first route as a whole. \citet{Chopra2023} argue for it persuasively and
+lower its cost with a survey of the available packages and a generator for
+template plotting code, but a guide to writing the code does not remove the
+prerequisites the code still has: a working R or Python environment, a local
+copy of the expression matrix, and a mapping from tissue nomenclature onto a
+parcellation.
+
+Among hosted resources, BrainScope \citep{Huisman2017} is the nearest neighbour
+to VEGABrain, and the only other entry in Table~\ref{tab:compare} that is at
+once web-based, developmental and willing to take a user's own gene set. The
+abstraction differs, and with it the question answered. BrainScope arranges the
+Allen adult and developing atlases as linked t-SNE maps of genes and samples,
+localising samples anatomically through choropleths over selected slices, and
+summarises a submitted set by its mean expression while delegating enrichment to
+Enrichr and ToppGene. VEGABrain asks the narrower question of where a set sits
+in a named parcellation, window by window, and answers it with a rank-based
+composite score rather than a mean, drawn on the Desikan--Killiany and
+\texttt{aseg} atlases that the imaging literature already uses. SMDB
+\citep{Cao2023} is likewise hosted and likewise anatomical, but for a different
+data type and species: it browses spatial transcriptomics sections against
+Allen's mouse brain coordinate framework and reconstructs morphology in three
+dimensions, with no human developmental axis and no gene-set layer.
+
 Enrichr \citep{Chen2013,Kuleshov2016} performs the gene-set reasoning but
 returns ranked term tables, with no anatomical or developmental dimension.
 \texttt{VoxHunt} \citep{Fleck2021} maps expression signatures onto developmental
 reference atlases, primarily to assign identity to \emph{in vitro} organoid
 samples, and is an R package rather than a hosted service. VEGABrain occupies the
-intersection: hosted, developmental, anatomical, and gene-set aware.
+intersection the others leave open: hosted, developmental, parcellated, and
+gene-set \emph{scored}.
 
 %%==================================================================%%
 \section{Discussion}\label{sec:discussion}
