@@ -10,7 +10,7 @@
 #   Rscript figures/make_figures.R fig4        # one figure
 #
 # Needs the prepared data objects in the repository root:
-#   dados_otimizados.rds, ontologia_micro.rds, ontologia_macro.rds
+#   dados_otimizados.rds, ontologyssGSEA.csv, mapeamento_regioes.csv
 # built by ../../preparaDados.R.
 
 suppressPackageStartupMessages({
@@ -37,19 +37,44 @@ AGES <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n =
 PAL  <- c("#1A318B", "#4F71BE", "#C2B4D6", "#D1498C", "#7A0845")
 
 message("loading data from ", ROOT)
-dados_app       <- readRDS(file.path(ROOT, "dados_otimizados.rds"))
-ontologia_micro <- readRDS(file.path(ROOT, "ontologia_micro.rds"))
-ontologia_macro <- readRDS(file.path(ROOT, "ontologia_macro.rds"))
-matrix_dados    <- as.matrix(dados_app$expression_matrix)
+dados_app    <- readRDS(file.path(ROOT, "dados_otimizados.rds"))
+matrix_dados <- as.matrix(dados_app$expression_matrix)
+
+# Sample -> atlas region is rebuilt from mapeamento_regioes.csv the way
+# preparaDados.R builds it, instead of read off col_meta$structure_mapped.
+# The .rds in the repository root predates the last mapping fix on two
+# parcels: it still names one "bankssts", which the DK atlas does not carry
+# and which therefore renders grey, and it still paints the three cerebellum
+# samples onto "corpus callosum". Going back to the CSV keeps the figures on
+# the same mapping the deployed API serves.
+mapeamento <- read.csv(file.path(ROOT, "mapeamento_regioes.csv"),
+                       stringsAsFactors = FALSE)
 
 meta_limpo <- dados_app$col_meta %>%
-  rename(region = structure_mapped) %>%
+  distinct(column_num, broad_age, structure_original) %>%
+  inner_join(mapeamento %>% select(structure_name, region, macro_region = macro_regions),
+             by = c("structure_original" = "structure_name"),
+             relationship = "many-to-many") %>%
   filter(!is.na(region), !is.na(broad_age)) %>%
-  select(column_num, region, broad_age, macro_region)
+  distinct(column_num, region, broad_age, macro_region)
 
 regioes_por_macro <- meta_limpo %>%
   filter(!is.na(macro_region)) %>%
   distinct(broad_age, region, macro_region)
+
+# One gene set's 524 sample-level scores, pulled out of the 9.7M-row export.
+# Figure 4 aggregates these here rather than reading ontologia_micro.rds for
+# the reason above: the precomputed tables carry the stale region names, and
+# aggregating from samples puts all three figures on one code path.
+scores_por_amostra <- function(geneset) {
+  csv <- file.path(ROOT, "ontologyssGSEA.csv")
+  if (!file.exists(csv))
+    stop("ontologyssGSEA.csv not found; run preparaDados.R first (see README.md)")
+  linhas <- system2("awk", c("-F,", shQuote(sprintf('$1 == "%s" { print $2 "," $3 }', geneset)),
+                             shQuote(csv)), stdout = TRUE)
+  if (length(linhas) == 0) stop("gene set not in ontologyssGSEA.csv: ", geneset)
+  read.csv(text = paste(c("column_num,Score_ssGSEA", linhas), collapse = "\n"))
+}
 
 # Mirrors build_brain_grid() in plumber.R: four stacked views, faceted by age.
 build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
@@ -103,30 +128,37 @@ fig_gene <- function(gene = "SOX10", escala = "micro", out = "fig3_gene_sox10.pd
   message("wrote ", file.path(OUT, out))
 }
 
-# ---- Figure 4: precomputed ontology score ---------------------------------
+# ---- Figure 4: ontology score ---------------------------------------------
 fig_ontology <- function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS",
                          escala = "micro", out = "fig4_ontology.pdf") {
-  df <- if (escala == "macro") {
-    ontologia_macro %>% filter(GeneSet == geneset) %>%
-      inner_join(regioes_por_macro, by = c("broad_age", "macro_region"),
-                 relationship = "many-to-many") %>%
-      select(broad_age, region, v = Score_Medio_ssGSEA)
-  } else {
-    ontologia_micro %>% filter(GeneSet == geneset) %>%
-      select(broad_age, region, v = Score_Medio_ssGSEA)
-  }
+  df <- scores_por_amostra(geneset) %>%
+    inner_join(meta_limpo, by = "column_num") %>%
+    mutate(broad_age = factor(broad_age, levels = AGES)) %>%
+    to_scale("Score_ssGSEA", escala)
   stopifnot(nrow(df) > 0)
-  df <- df %>% mutate(broad_age = factor(broad_age, levels = AGES))
   sc <- scale_fill_gradientn(colors = PAL, name = "ssGSEA score", na.value = "darkgray")
   ggsave(file.path(OUT, out), build_brain_grid(df, "v", sc), width = 11, height = 9, device = cairo_pdf)
   message("wrote ", file.path(OUT, out))
 }
 
 # ---- Figure 5: on-demand ssGSEA for a user gene list ----------------------
-fig_genelist <- function(genes = c("GAD1", "GAD2", "SLC32A1", "GABRB3"),
+# The demonstration list is the dorsal/glutamatergic specification programme
+# that Fischer et al. (2021, Alcohol Clin Exp Res 45:979-995) report as
+# upregulated by chronic intermittent ethanol in human pluripotent stem cells
+# differentiated to first-trimester-equivalent cortical neurons. Only genes
+# whose direction that paper states in the text are included. It stands in for
+# a real differential-expression result rather than a marker panel, and its
+# developmental window is experimentally explicit, which is what makes the map
+# checkable: these genes should peak in the first trimester.
+FAS_DORSAL <- c("EMX2", "LHX1", "LHX2", "LHX5", "LHX9", "OTX2", "FEZF2",
+                "NEUROD1", "NEUROD2", "NEUROD6", "NEUROG2", "TBR1", "EOMES")
+
+fig_genelist <- function(genes = FAS_DORSAL,
                          escala = "micro", out = "fig5_genelist.pdf") {
   valid <- intersect(genes, rownames(matrix_dados))
   stopifnot(length(valid) > 0)
+  if (length(valid) < length(genes))
+    message("not in the matrix: ", paste(setdiff(genes, valid), collapse = ", "))
   res <- GSVA::gsva(GSVA::ssgseaParam(exprData = matrix_dados,
                                       geneSets = list(UserSet = valid)), verbose = FALSE)
   df <- data.frame(column_num   = as.numeric(colnames(res)),
@@ -134,6 +166,9 @@ fig_genelist <- function(genes = c("GAD1", "GAD2", "SLC32A1", "GABRB3"),
     inner_join(meta_limpo, by = "column_num") %>%
     mutate(broad_age = factor(broad_age, levels = AGES)) %>%
     to_scale("Score_ssGSEA", escala)
+  # Per-window means back the face-validity paragraph in Section 4.2.
+  print(df %>% group_by(broad_age) %>%
+          summarise(mean_score = mean(v), .groups = "drop") %>% as.data.frame())
   sc <- scale_fill_gradientn(colors = PAL, name = "Custom ssGSEA", na.value = "darkgray")
   ggsave(file.path(OUT, out), build_brain_grid(df, "v", sc), width = 11, height = 9, device = cairo_pdf)
   message("wrote ", file.path(OUT, out))

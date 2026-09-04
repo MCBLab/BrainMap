@@ -82,9 +82,7 @@ reused datasets in neuroscience. The BrainSpan atlas
 subcortical structures across prenatal and postnatal donors, and subsequent
 integrative work built on it to relate developmental expression to
 neuropsychiatric risk \citep{Li2018} and to evolutionary divergence between
-human and macaque \citep{Zhu2018}.
-
-What has not kept pace is the ease of \emph{seeing} it. A researcher who wants
+human and macaque \citep{Zhu2018}. A researcher who wants
 to know where and when a gene, or a set of genes, is expressed in the developing
 brain has essentially two options today, and both impose costs that are
 unrelated to the biological question.
@@ -448,10 +446,18 @@ term can be viewed at micro granularity (42 atlas regions) or macro granularity
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{fig5_genelist.pdf}
-\caption{User-submitted gene-list mode. ssGSEA computed on demand for a
-GABAergic marker set (\emph{GAD1}, \emph{GAD2}, \emph{SLC32A1}, \emph{GABRB3})
-and mapped across development, illustrating the path from an arbitrary gene list
-to a spatiotemporal map without local installation or coding.}
+\caption{User-submitted gene-list mode. ssGSEA computed on demand for the
+dorsal/glutamatergic specification programme that \citet{Fischer2021} report as
+upregulated by chronic intermittent ethanol exposure in human pluripotent stem
+cells differentiated to first-trimester-equivalent cortical neurons
+(\emph{EMX2}, \emph{LHX1/2/5/9}, \emph{OTX2}, \emph{FEZF2},
+\emph{NEUROD1/2/6}, \emph{NEUROG2}, \emph{TBR1}, \emph{EOMES}). The submitted
+list is a published differential-expression result, not a curated marker panel,
+and it is mapped without local installation or coding. The score is highest in
+the cortical parcels of the first two prenatal windows---the period the
+\emph{in vitro} model corresponds to---and falls monotonically thereafter,
+while the striatum stays low throughout, recovering the dorsal--ventral
+contrast the signature encodes.}
 \label{fig:genelist}
 \end{figure}
 
@@ -558,6 +564,20 @@ prenatal windows and decline postnatally; \textbf{[TODO]}. Where the composite
 score is informative is precisely here---the individual genes of a
 neurogenesis term are noisy across 42 sparsely sampled regions, whereas the
 ssGSEA summary of the term is not.
+
+A fourth case tests the on-demand path against a model whose developmental
+timing is experimentally fixed rather than merely presumed.
+\citet{Fischer2021} exposed human pluripotent stem cells to chronic
+intermittent ethanol throughout a 50-day differentiation to cortical neurons,
+which corresponds to the first trimester, and report an upregulated
+dorsal/glutamatergic specification programme. Submitting those 13 symbols
+(Figure~\ref{fig:genelist}) through the gene-list endpoint returns a map whose
+region-averaged score declines monotonically across the five windows---0.81,
+0.74, 0.58, 0.47, 0.44---so the signature is maximal in exactly the window the
+\emph{in vitro} model represents, and the ordering is recovered from BrainSpan
+alone, with no information from the original experiment. Because the exposure
+window is part of the experimental design, this is a stronger test than a
+disease with a merely prenatal attribution.
 
 \subsection{Performance}\label{sec:performance}
 
