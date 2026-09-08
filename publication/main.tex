@@ -87,43 +87,9 @@ to know where and when a gene, or a set of genes, is expressed in the developing
 brain has essentially two options today, and both impose costs that are
 unrelated to the biological question.
 
-The first is the resource portal. Portals in this family---BrainSpan itself, and
-the wider family of Allen Institute browsers \citep{Lau2008,Sunkin2013}---return
-the data as tables, line plots or heat maps indexed by structure acronym. This
-is faithful but not anatomical: the reader must hold the mapping from
-\texttt{DFC}, \texttt{MFC} or \texttt{STC} to a location in the brain in their
-head, and a heat map of 26 structure codes does not convey a spatial gradient
-the way a rendered cortex does. It is also gene-at-a-time. There is no route
-from a gene set, a pathway, or the output of a differential-expression analysis
-to a spatial view.
+In most cases, conventional data-sharing platforms, such as the BrainSpan portal \citep{Huisman2017, Sunkin2013} and the Allen Institute's browsers \citep{Huisman2017, Cao2023}, present transcriptomic profiles in tables, line graphs, or heatmaps indexed by abstract anatomical acronyms (such as DFC, MFC, or STC), requiring researchers to keep these abbreviations in mind in relation to the actual physical brain structure. Moreover, this classical visualization approach is also limited to analyzing one gene at a time, offering no direct pathway to translate co-expression signatures, gene sets, or differential expression analyses into intuitive spatial representations \citep{Huisman2017}. Part of this visualization bottleneck has been overcome by the development of next-generation interactive web portals, such as BrainScope, which employs dual t-SNE algorithms to dynamically connect genomic space and brain samples directly to choropleths and anatomical slices, and the SMDB (Spatial Multimodal Data Browser) \citep{Cao2023}, an online browser that enables morphological reconstruction and the exploration of spatial transcriptomic data in 2D and 3D on the web, without the need for complex local installations.
 
-One portal in this family goes considerably further. BrainScope
-\citep{Huisman2017} places the Allen adult and developing atlases behind an
-interactive interface and does accept a user-supplied gene set. Its organising
-abstraction, however, is a pair of linked t-SNE maps---one of genes, one of
-samples---in which anatomy is recovered indirectly, through choropleths over
-user-selected slices that localise the samples; a submitted set is summarised by
-its mean expression, and functional interpretation is handed off to external
-enrichment servers. The spatial question it answers is thus one of similarity
-structure among samples rather than of position in a named parcellation, and it
-is answered without a composite enrichment score.
-
-The second option is to do it yourself. Excellent programmatic brain-plotting
-tools exist---\texttt{ggseg} and \texttt{ggseg3d} in R
-\citep{Mowinckel2020}, \texttt{neuromaps} in Python \citep{Markello2022}, and
-\texttt{abagen} for the adult Allen Human Brain Atlas
-\citep{Hawrylycz2012,Markello2021}, and \texttt{cerebroViz} for region-level
-spatiotemporal data \citep{Bahl2017}---and
-the case for producing figures programmatically rather than through graphical
-interfaces has been made convincingly \citep{Chopra2023}: it is reproducible,
-scriptable and version-controllable. But that route presupposes a user who
-writes R or Python, who is willing to download and hold a $52{,}376 \times 524$
-expression matrix locally, and who will construct and validate the mapping from
-BrainSpan's tissue nomenclature onto an atlas parcellation. Each of those steps
-is a place where a project stalls or a mapping silently diverges between
-laboratories. The barrier is not conceptual; it is logistical, and it falls
-hardest on exactly the clinicians and experimental biologists whose domain
-knowledge would make the interpretation valuable.
+On the other hand, although the programmatic approach offers unquestionable advantages in terms of reproducibility, version control, and automation of scientific figures \citep{Chopra2023}, it imposes logistical barriers that are difficult to overcome for researchers without advanced training in computing. Well-established tools in R, such as cerebroViz \citep{Bahl2017} (for spatiotemporal mapping in vector diagrams) and the ggseg and ggseg3d libraries \citep{Mowinckel2020}, as well as the Python packages abagen \citep{Markello2021, Markello2022} and neuromaps \citep{Markello2022}, require users to manage and process massive data matrices and perform complex steps to reconcile tissue nomenclatures with brain atlas parcellations \citep{Chopra2023, Markello2021}. Since these normalization and alignment steps vary considerably and can introduce silent discrepancies in statistical estimates across laboratories \citep{Markello2021}, it becomes imperative to move toward platforms that integrate these complex analyses into accessible interfaces, thereby alleviating the burden of these technical demands on clinicians and experimental biologists who hold the crucial biological knowledge needed to interpret these results \citep{Chopra2023, Markello2021}.
 
 There is a third gap that neither option addresses. Modern analyses rarely end
 with one gene. They end with a list---a differentially expressed set, a module
@@ -135,7 +101,7 @@ into a single per-sample summary. Single-sample gene set enrichment analysis
 \citep{Subramanian2005} implemented alongside GSVA \citep{Hanzelmann2013},
 provides exactly such a composite score, and has been used as a quantitative
 readout of pathway activity in expression data
-\citep{Yi2020}. To our knowledge no tool has applied it as a
+\citep{Yi2020}. The incorporation of composite multigene activity scores (such as those generated by ssGSEA or GSVA) into anatomical models directly addresses the challenge of condensing high-dimensional expression profiles into interpretable summaries, ensuring noise reduction and dimensionality reduction compared to classical single-gene-based analyses \citep{Hanzelmann2013}. To our knowledge no tool has applied it as a
 \emph{spatial} layer over the developing human brain.
 
 VEGABrain (Visualizer of Enriched Gene Analysis) addresses these three gaps in
