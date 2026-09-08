@@ -57,7 +57,7 @@ scores_ontologia <- function(geneset, escala) {
 # Redeclarada dentro de cada endpoint; aqui em cima porque agrega_por_regiao()
 # resolve o nome pelo ambiente onde foi definida, nao pelo de quem a chama.
 ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)",
-                  "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
+                  "3rd trimester (n = 5)", "Infant (n = 14)", "Adult (n = 8)")
 
 # Le a caixa de texto da aba Gene List. Cada linha e "GENE" ou "GENE <log2FC>",
 # com espaco, tab, virgula ou ponto-e-virgula entre os dois. Uma linha unica
@@ -320,7 +320,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
 grafico_gene <- function(gene = "SOX10", escala = "micro") {
   if (!(gene %in% rownames(matrix_dados))) stop("Erro: Gene não encontrado.")
 
-  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
+  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 14)", "Adult (n = 8)")
   matrix_dados <- as.matrix(dados_app$expression_matrix)
 
   dados_base <- data.frame(
@@ -370,7 +370,7 @@ function(gene = "SOX10", escala = "micro") {
 }
 
 grafico_ontologia <- function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
-  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
+  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 14)", "Adult (n = 8)")
 
   dados_prontos <- scores_ontologia(geneset, escala)
 
@@ -466,7 +466,7 @@ function(gene_string = "", escala = "micro") {
 #* @get /data_brain
 function(gene = "SOX10", escala = "micro") {
   
-  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
+  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 14)", "Adult (n = 8)")
   
   dados_base <- data.frame(
     column_num = as.numeric(colnames(matrix_dados)), 
@@ -495,7 +495,7 @@ function(gene = "SOX10", escala = "micro") {
 #* @serializer csv
 #* @get /data_ontology
 function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
-  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 8)", "Adult (n = 14)")
+  ordem_idades <- c("1st trimester (n = 5)", "2nd trimester (n = 10)", "3rd trimester (n = 5)", "Infant (n = 14)", "Adult (n = 8)")
 
   dados_prontos <- scores_ontologia(geneset, escala)
 

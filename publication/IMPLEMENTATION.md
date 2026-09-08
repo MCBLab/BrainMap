@@ -158,7 +158,138 @@ repository root.
 referenced by `main.tex`. Filenames are identical to the real outputs, so
 swapping them in requires no edit to `main.tex`.
 
-## 6. Reference ledger
+## 6. Per-structure enrichment testing
+
+The maps paint magnitude. `figures/enrichment_stats.R` adds inference: which
+structures are *significantly* enriched for a gene set, in which window.
+
+### Unit of inference
+
+**The BrainSpan structure, never the ggseg parcel.** The atlas draws 29 parcels
+but BrainSpan sampled only 22 structures, and several parcels are byte-identical
+(`Caudate`/`Putamen`/`accumbens area`/`insula` are all one "striatum"
+dissection). Testing parcels would report one measurement as up to four
+independent findings. Results are painted outward for display only, and a parcel
+inherits its structure's verdict — scores can be averaged across contributing
+structures, p-values cannot.
+
+That gives **87 populated (structure, window) cells, 70 with >= 3 donors**. Cells
+below that are not tested (`tested = FALSE`) and render grey. `p.adjust` is fed
+`NA` for them, so the BH family is 70, not 87 — verified.
+
+### Two tests, a cell must pass both
+
+| | asks | null |
+|---|---|---|
+| competitive | is this set unusual among size-matched sets, here? | rank within the 18,222-set reference |
+| spatial | is that consistent across donors, or one donor's tissue? | permute structure labels **within donor** |
+
+They are not co-equal partners. The spatial test rejects for a large share of
+arbitrary gene sets, so it works as a **guard**: the competitive test selects,
+the spatial test removes cells where the signal is not backed by consistent
+across-donor evidence. `GOBP_MYELIN_ASSEMBLY` is the clean illustration — strong
+competitive signal in adult structures, no spatial support, correctly zero hits.
+
+Combined by intersection, not by pooling p-values: the two are dependent through
+the same cell means, and Fisher would let one small p carry a cell that fails the
+other test, defeating the point.
+
+### Three things that are load-bearing
+
+**Within-window centring.** Centre globally instead and any gene set with a
+developmental trend lights up every structure of its peak window — a true
+statement about time, a false one about place.
+
+**Size adjustment.** ssGSEA spread falls ~2.2x from the smallest gene sets to the
+largest; unadjusted, the upper tail is owned entirely by small sets. Effective
+size (unique symbols intersected with the matrix) is used, not `length()` —
+2,894 sets repeat symbols.
+
+**The scale constant.** GSVA's `ssgsea` divides by one global scalar, the range
+over every set x sample *in that call*. The precomputed table was divided by the
+range over 18,646 sets; a user's list, scored alone, is divided by its own. The
+constant is recoverable exactly from a single gene set — **K_PRE = 39802.5579**,
+reproduced across three sets to a relative range of 4e-16 — so on-demand scoring
+uses `normalize = FALSE` and the reference is multiplied by K_PRE. No re-running
+of the pipeline, and `build_stats_cache.R` asserts the constant so a GSVA upgrade
+breaks the build instead of silently shifting every p-value.
+
+**`Dockerfile.api` does not pin GSVA** (ggseg is pinned at v2.1.1). Pin it before
+any of this is deployed.
+
+### Calibration
+
+| check | result | nominal |
+|---|---|---|
+| competitive, real sets vs own population | **0.0467** at p<=0.05; flat across all six size bands (0.044-0.053) | 0.05 |
+| competitive, random gene lists | 0.0286 — conservative | 0.05 |
+| spatial, labels scrambled within donor | 0.0538 | 0.05 |
+| family level, random lists | **0.000** of 150 produce any enriched cell | <= 0.05 |
+| family level, scrambled real sets (stress test) | **0.015** of 200; max 1 cell in any null set | <= 0.05 |
+
+The competitive p is a rank within the reference population, so its null is "this
+set is an ordinary member of that population" — which a real set with itself
+excluded is exactly. **Do not build that null by scrambling structure labels.**
+Scrambling removes a set's regional signal but also strips the systematic offset
+every real set carries in a cell, so a scrambled query stops being exchangeable
+with the reference and the test reads ~1.5x anti-conservative (worse for large
+sets). That is an artifact of the null, not the statistic — confirmed by the fact
+that it is completely insensitive to both tuning parameters.
+
+Worth keeping that row anyway as a stress test: even feeding the pipeline a query
+the competitive test is *mis-calibrated against*, BH over 70 cells plus the
+spatial intersection absorbs the per-cell inflation completely — 0.015 at the
+family level, and no null set ever produced more than one enriched cell. Whatever
+the per-cell rate, a figure built this way does not manufacture findings.
+
+The honest limitation: a user's gene list is not drawn from MSigDB, so its
+exchangeability with the reference is an assumption. Random lists come out
+conservative, which is the safe direction.
+
+### Controls
+
+| gene set | cells | where |
+|---|---|---|
+| `GOBP_CEREBELLAR_CORTEX_DEVELOPMENT` | 2 | cerebellar cortex (Infant, Adult); top 4 cells by p are all cerebellum |
+| `GOBP_FOREBRAIN_GENERATION_OF_NEURONS` | 4 | amygdaloid complex, three windows |
+| `GOBP_MYELIN_ASSEMBLY` | 0 | correctly none — temporal, not spatial |
+
+### Power is uneven and must be shown
+
+Donors per window are 5 / 10 / 5 / 14 / 8. The **3rd trimester** is the weak one:
+its donors contribute 1, 1, 3, 15, 15 samples, its median structure rests on two
+people, and its smallest attainable p is 1.5e-3. It is flagged
+(`underpowered_window`), not suppressed. The 1st trimester is *not* weak despite
+also having 5 donors — 67 samples across 21 structures.
+
+### Files and runtimes
+
+```
+figures/enrichment_stats.R    statistics; pure except two score fetchers
+figures/build_stats_cache.R   -> enrichment_reference.rds (26 MB), 52 s
+figures/validate_stats.R      the calibration table above, ~18 min
+figures/fig6_enrichment.R     -> fig6_enrichment.pdf
+```
+
+An on-demand gene list costs ~45 s end to end, dominated by GSVA; the statistics
+themselves are ~1 s.
+
+### Rendering
+
+Fill is the **within-window deviation**, not the raw score. Painting the raw
+score produces a figure that argues with itself: the cerebellum carries its
+highest absolute ssGSEA prenatally but is only *distinctive* among structures in
+infancy and adulthood, so a raw-score fill shows a blue parcel ringed as
+significant.
+
+Significance is carried by the outline of the same `geom_brain` layer
+(`colour` and `linewidth` in the `aes`), not a second layer. A separate overlay
+does not work: ggseg appends its own `scale_fill_manual` whenever `fill` is
+absent from a layer's mapping, which collides with the continuous scale. The
+upshot for `plumber.R` is that `build_brain_grid` needs no signature change —
+only its `aes()`.
+
+## 7. Reference ledger
 
 34 entries in `references.bib`; 20 have the full text archived in
 `references/<Key>.pdf`. Bib key ⇄ filename is 1:1 (`Zhu2019.pdf` was renamed to
@@ -197,7 +328,7 @@ curl -sL -o references/<Key>.pdf "https://europepmc.org/articles/<pmcid lowercas
 The lowercase `pmcid` matters — `?pdf=render` returns HTTP 500 for an uppercase
 `PMCID`.
 
-## 7. Second pass
+## 8. Second pass
 
 Everything below is deliberately unfinished in the current draft.
 

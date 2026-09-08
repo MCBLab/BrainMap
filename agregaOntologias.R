@@ -8,10 +8,18 @@ library(dplyr)
 
 dados_app <- readRDS("dados_otimizados.rds")
 
+# Amostra -> regiao vem de mapeamento_regioes.csv, nao de col_meta$structure_mapped.
+# O .rds guarda o mapeamento que valia quando foi gerado; ler o CSV faz esta
+# reagregacao valer para a versao atual sem precisar reconstruir o .rds antes.
+mapeamento <- read.csv("mapeamento_regioes.csv", stringsAsFactors = FALSE)
+
 meta_agg <- dados_app$col_meta %>%
-  rename(region = structure_mapped) %>%
+  distinct(column_num, broad_age, structure_original) %>%
+  inner_join(mapeamento %>% select(structure_name, region, macro_region = macro_regions),
+             by = c("structure_original" = "structure_name"),
+             relationship = "many-to-many") %>%
   filter(!is.na(region), !is.na(broad_age)) %>%
-  select(column_num, region, broad_age, macro_region)
+  distinct(column_num, region, broad_age, macro_region)
 
 message("==> Lendo ontologyssGSEA.csv...")
 scores_com_meta <- vroom(

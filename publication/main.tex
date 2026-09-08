@@ -195,8 +195,8 @@ service loads at start-up.
 BrainSpan donors span 31 distinct ages from 8 post-conceptional weeks to 40
 years. Individual ages are too sparsely sampled to render as separate maps, so
 donors are binned into five developmental windows: first trimester ($n=5$
-donors), second trimester ($n=10$), third trimester ($n=5$), infant ($n=8$) and
-adult ($n=14$). The bin boundaries and their donor counts are given in
+donors), second trimester ($n=10$), third trimester ($n=5$), infant ($n=14$) and
+adult ($n=8$). The bin boundaries and their donor counts are given in
 Table~\ref{tab:data}; the donor count is displayed in every facet label in the
 interface so that the reader is never shown a map without also being shown how
 much evidence stands behind it.
@@ -215,7 +215,7 @@ belongs to. Cortical regions map onto the Desikan--Killiany parcellation
 \texttt{ggseg} \citep{Mowinckel2020}.
 
 The interface exposes two levels of granularity. At the \emph{micro} scale each
-of the 42 mapped atlas regions carries its own value. At the \emph{macro} scale
+of the 29 mapped atlas regions carries its own value. At the \emph{macro} scale
 regions are pooled into six anatomical groupings---frontal, parietal, temporal
 and occipital lobes, subcortical structures and cerebellum---the mean is taken
 within each grouping, and that mean is painted back onto every region belonging
@@ -266,7 +266,7 @@ together with Human Phenotype Ontology terms \citep{Kohler2021}. The resulting
 Scores are computed once for every gene set against all 524 samples, then
 aggregated: for each (gene set, developmental window, region) triple the mean
 score over the contributing samples is stored, and analogously for macro-regions.
-This reduces roughly $9.8$ million sample-level scores to 3{,}188{,}466 rows at
+This reduces roughly $9.8$ million sample-level scores to 2{,}423{,}980 rows at
 the micro scale, which is what makes interactive response possible---an ontology
 query becomes a filter over a precomputed table rather than a fresh enrichment
 run. When instead a user submits their own gene list, the symbols are validated
@@ -427,7 +427,9 @@ legend, the SVG and CSV export buttons, and the reference-map control.}
 across the five developmental windows (columns) in four views (rows): right
 lateral cortex and right medial cortex on the Desikan--Killiany parcellation,
 and subcortical structures in sagittal and coronal section on the \texttt{aseg}
-segmentation. Grey indicates regions with no BrainSpan sample in that window.}
+segmentation. Grey indicates atlas parcels BrainSpan did not sample, or sampled
+in other windows only: of the parcels drawn, 29 carry data, and four of those are
+present in fewer than five windows.}
 \label{fig:gene}
 \end{figure}
 
@@ -437,7 +439,7 @@ segmentation. Grey indicates regions with no BrainSpan sample in that window.}
 \caption{Ontology mode: composite ssGSEA score for
 \texttt{GOBP\_FOREBRAIN\_GENERATION\_OF\_NEURONS} across development. The score
 summarises every gene in the term into one value per region and window; the same
-term can be viewed at micro granularity (42 atlas regions) or macro granularity
+term can be viewed at micro granularity (29 atlas regions) or macro granularity
 (six anatomical groupings).}
 \label{fig:ontology}
 \end{figure}
@@ -464,14 +466,15 @@ Property & Value \\
 \midrule
 Expression source        & BrainSpan RNA-Seq, Gencode v10 RPKM, gene-summarised \\
 Matrix dimensions        & 52{,}376 genes $\times$ 524 samples \\
+Samples mapped to a region & 516 of 524, from 22 BrainSpan structures \\
 Transformation           & $\log_2(\mathrm{RPKM}+1)$; duplicate symbols dropped \\
 Developmental windows    & 5 (see below) \\
 \quad 1st trimester      & 5 donors \\
 \quad 2nd trimester      & 10 donors \\
 \quad 3rd trimester      & 5 donors \\
-\quad Infant             & 8 donors \\
-\quad Adult              & 14 donors \\
-Atlas regions (micro)    & 42 (Desikan--Killiany cortical + \texttt{aseg} subcortical) \\
+\quad Infant             & 14 donors \\
+\quad Adult              & 8 donors \\
+Atlas regions (micro)    & 29 (Desikan--Killiany cortical + \texttt{aseg} subcortical) \\
 Anatomical groups (macro)& 6 (frontal, parietal, temporal, occipital, subcortical, cerebellum) \\
 Views per map            & 4 (DK lateral, DK medial, \texttt{aseg} sagittal, \texttt{aseg} coronal) \\
 Gene sets scored         & 18{,}650 total \\
@@ -483,7 +486,7 @@ Gene sets scored         & 18{,}650 total \\
 \quad BioCarta           & 292 \\
 \quad KEGG (legacy)      & 186 \\
 \quad MSigDB hallmark    & 50 \\
-Aggregated score rows    & 3{,}188{,}466 (gene set $\times$ window $\times$ region) \\
+Aggregated score rows    & 2{,}423{,}980 (gene set $\times$ window $\times$ region) \\
 \botrule
 \end{tabular}
 \end{table}
@@ -553,7 +556,7 @@ second trimester onward with subcortical and then cortical distribution;
 \textbf{[TODO]}. Neurogenesis-associated ontology terms should peak in the
 prenatal windows and decline postnatally; \textbf{[TODO]}. Where the composite
 score is informative is precisely here---the individual genes of a
-neurogenesis term are noisy across 42 sparsely sampled regions, whereas the
+neurogenesis term are noisy across 29 sparsely sampled regions, whereas the
 ssGSEA summary of the term is not.
 
 \subsection{Performance}\label{sec:performance}

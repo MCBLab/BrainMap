@@ -30,8 +30,13 @@ mapping_df <- mapeamento_completo %>%
   select(region, structure_name) %>%
   as.data.frame()
 
+# distinct(): uma regiao pode ser alimentada por mais de uma structure_name
+# (Cerebellum vem de "cerebellum" e de "cerebellar cortex"; Thalamus vem de
+# "dorsal thalamus" e do nucleo mediodorsal), e sem isto o left_join por region
+# duplicaria as amostras dessas regioes.
 mapping_macro <- mapeamento_completo %>%
   select(region, macro_region = macro_regions) %>%
+  distinct() %>%
   as.data.frame()
 
 # Mapeamento de idades
@@ -73,8 +78,8 @@ age_mapping <- c(
   rep("1st trimester (n = 5)", 3),
   rep("2nd trimester (n = 10)", 5),
   rep("3rd trimester (n = 5)", 5),
-  rep("Infant (n = 8)", 10),
-  rep("Adult (n = 14)", 8)
+  rep("Infant (n = 14)", 10),
+  rep("Adult (n = 8)", 8)
 )
 
 age_df <- data.frame(
