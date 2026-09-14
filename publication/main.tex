@@ -127,7 +127,7 @@ installation, account or download. Its contributions are:
 \item \textbf{On-demand scoring of user-submitted gene lists.} A user may paste
       an arbitrary list of HGNC symbols; VEGABrain validates them against the
       matrix, runs ssGSEA for that set on the fly, and returns the same
-      developmental map. This closes the loop from an enrichment result
+      developmental map. In the same time, import the log2 fold-change values from an external comparison — a different disease model, treatment, or condition — and plot them against the BrainSpan expression data. This lets you run analyses along directions the dataset wasn't originally built for, not just the comparisons already included in it.
       \citep{Chen2013,Kuleshov2016} back to anatomy.
 \end{enumerate}
 
@@ -323,7 +323,7 @@ user-submitted gene list triggers a fresh ssGSEA run over all 524 samples.}
 \section{Results: the VEGABrain tool}\label{sec:results}
 %%==================================================================%%
 
-VEGABrain opens on a single working page (Figure~\ref{fig:ui}) with a control
+VEGABrain opens on a single working page with a control
 column on the left and the rendered map on the right. Two switches apply to
 every mode: the region granularity toggle (micro/macro, Section~\ref{sec:mapping})
 and the query mode. All three modes produce the same four-panel,
@@ -377,15 +377,6 @@ from its export cannot disagree.
 %%------------------------------------------------------------------%%
 %% Figures 2-5 (placeholders in this draft -- see IMPLEMENTATION.md)
 %%------------------------------------------------------------------%%
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{fig2_interface.pdf}
-\caption{The VEGABrain interface. Left: query mode selector (gene list, single
-gene, ontology), the micro/macro granularity toggle, and the search or paste
-control for the active mode. Right: the rendered four-panel map with its colour
-legend, the SVG and CSV export buttons, and the reference-map control.}
-\label{fig:ui}
-\end{figure}
 
 \begin{figure}[htbp]
 \centering
