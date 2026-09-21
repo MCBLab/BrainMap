@@ -172,11 +172,7 @@ much evidence stands behind it.
 
 BrainSpan labels tissue by dissected structure (for example \emph{dorsolateral
 prefrontal cortex}), whereas \texttt{ggseg} draws atlas parcels (for example
-\emph{rostral middle frontal}). Bridging the two is the step that most commonly
-diverges between reimplementations, so VEGABrain externalises it into a single
-version-controlled file, \texttt{mapeamento\_regioes.csv}, with one row per atlas
-region giving the BrainSpan structure it corresponds to and the macro-region it
-belongs to. Cortical regions map onto the Desikan--Killiany parcellation
+\emph{rostral middle frontal}). Cortical regions map onto the Desikan--Killiany parcellation
 \citep{Desikan2006} and subcortical structures onto the FreeSurfer
 \texttt{aseg} segmentation \citep{Fischl2002}, both accessed through
 \texttt{ggseg} \citep{Mowinckel2020}.
@@ -252,21 +248,7 @@ Table~\ref{tab:api}. Maps are rendered with \texttt{ggplot2} and
 browser displays is already a vector figure at publication quality; tabular
 endpoints return CSV. The front end is a React single-page application served
 as static files from GitHub Pages, holding no data of its own and calling the
-API directly. An earlier prototype ran as a single Shiny application
-\citep{Chang2025shiny}; splitting it into an API and a static client is what
-lets the front end be hosted at no cost and the compute scale to zero
-independently of it.
-
-The service is containerised and deployed to Google Cloud Run with 4~GiB of
-memory and 2 vCPUs. Because the R process is single-threaded, request
-concurrency is capped at four, and the request timeout is raised to 900~s to
-accommodate on-demand ssGSEA runs. The service scales to zero between
-requests, which suits the expected sporadic usage and keeps hosting within a
-free tier; the front end retries the initial listing calls so that a cold start
-is absorbed transparently. Both deployments are automated---the front end by a
-GitHub Actions workflow on push, the API by a single script---and the container
-definition pins package versions so that a rebuild reproduces the analysis
-environment.
+API directly.
 
 %%------------------------------------------------------------------%%
 %% Figure 1 -- architecture (drawn inline; no external asset)
@@ -486,28 +468,7 @@ Endpoint & Method & Returns \\
 \section{Validation and comparison}\label{sec:validation}
 %%==================================================================%%
 
-\subsection{Correctness of the scoring pipeline}\label{sec:correctness}
-
-The precomputed scores served by VEGABrain and a score computed directly from
-the public matrix must agree, since the precomputation is intended purely as a
-caching step. We verify this by re-running \texttt{GSVA::gsva} with
-\texttt{ssgseaParam} on the same expression matrix for a random sample of gene
-sets, aggregating the result by developmental window and region exactly as the
-offline pipeline does, and comparing against the served values.
-
-% TODO-measure: run the reproduction script and substitute the three values below.
-Across \textbf{[TODO: $n$]} randomly drawn gene sets the served and recomputed
-per-region scores agreed to a Pearson correlation of \textbf{[TODO: $r$]} with a
-maximum absolute difference of \textbf{[TODO: $\Delta$]}, consistent with
-floating-point accumulation order alone. The on-demand path is validated the
-same way: submitting the member genes of a precomputed set through the gene-list
-endpoint reproduces that set's stored map to \textbf{[TODO: $\Delta$]}.
-
 \subsection{Biological face validity}\label{sec:facevalidity}
-
-Correct arithmetic is not sufficient; the maps must also recover developmental
-patterns that are independently established. We examined three cases whose
-expected behaviour is not in dispute.
 
 % TODO-measure: replace the qualitative statements below with the rendered maps
 % and, where useful, the per-window means from the CSV exports.
@@ -674,12 +635,6 @@ a regional value reflects both cell-intrinsic expression and cell-type
 composition. A rise in an oligodendrocyte programme across development is as
 consistent with more oligodendrocytes as with more transcription per cell.
 Single-cell atlases resolve this and are the natural next data source.
-
-\paragraph{The atlas mapping is an approximation.} BrainSpan dissections and
-Desikan--Killiany parcels do not correspond one-to-one; several parcels share a
-BrainSpan structure, and the macro scale pools further. The mapping is published
-as a single CSV precisely so that it can be inspected, criticised and revised
-rather than trusted implicitly.
 
 \paragraph{ssGSEA scores are within-sample ranks.} Equation~\ref{eq:ssgsea}
 yields a value that is comparable across samples for a fixed gene set, but not
