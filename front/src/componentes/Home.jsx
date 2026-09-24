@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
 
 // URL da API, injetada em build time via VITE_API_URL (no GitHub Pages aponta
@@ -69,6 +69,29 @@ export default function Home() {
   const [modalAberto, setModalAberto] = useState(false);
   const [abaMapaRef, setAbaMapaRef] = useState('lateral');
   const [escalaMapaRef, setEscalaMapaRef] = useState('micro');
+
+  const inputArquivoRef = useRef(null);
+
+  // Le o arquivo (.txt/.csv/.tsv) como texto puro e joga no mesmo estado do
+  // textarea. O parseAssinatura ja aceita virgula/tab/espaco e cabecalho de
+  // DESeq2/edgeR/limma, entao nao ha parsing extra para fazer aqui.
+  const handleUploadArquivo = (evento) => {
+    const arquivo = evento.target.files?.[0];
+    if (!arquivo) return;
+
+    const leitor = new FileReader();
+    leitor.onload = (e) => {
+      setTextoListaGenes(e.target.result);
+    };
+    leitor.onerror = () => {
+      alert('Não foi possível ler o arquivo.');
+    };
+    leitor.readAsText(arquivo);
+
+    // Permite selecionar o mesmo arquivo de novo depois (o <input> nao dispara
+    // onChange se o value nao mudar).
+    evento.target.value = '';
+  };
 
   // Buscando lista de Genes ou Ontologias no R (com Retry automático)
   useEffect(() => {
@@ -392,6 +415,19 @@ export default function Home() {
                   >
                     Example with log2FC
                   </button>
+                  <button
+                    onClick={() => inputArquivoRef.current?.click()}
+                    className="text-[10px] text-zinc-500 hover:text-[#58614c] font-bold underline transition-colors"
+                  >
+                    Upload file
+                  </button>
+                  <input
+                    ref={inputArquivoRef}
+                    type="file"
+                    accept=".txt,.csv,.tsv"
+                    onChange={handleUploadArquivo}
+                    className="hidden"
+                  />
                 </div>
               )}
             </div>
