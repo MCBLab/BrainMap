@@ -5,7 +5,7 @@ export default function About() {
         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.3em] mb-4">
           About This App
         </p>
-        <h1 className="text-6xl font-bold text-[#2d3435] leading-tight tracking-tighter mb-8">
+        <h1 className="text-5xl font-bold text-[#2d3435] leading-tight tracking-tighter mb-8 whitespace-nowrap">
           Human Developmental Brain RNA-Seq Dataset
         </h1>
 
@@ -75,9 +75,7 @@ export default function About() {
                 Bring in your own log2 fold-change values from an external
                 comparison — a different disease model, treatment, or
                 condition — and plot them against the BrainSpan expression
-                data. This lets you run analyses along directions the
-                dataset wasn't originally built for, not just the
-                comparisons already included in it.
+                data.
               </p>
             </div>
           </div>
