@@ -54,6 +54,10 @@ COPY preparaDados.R /api/
 
 RUN Rscript preparaDados.R
 
+# Estatistica dos asteriscos de significancia da aba Gene List (a mesma da
+# publicacao). Nao ha referencia pre-computada: tudo sai da matriz em tempo real.
+COPY publication/figures/enrichment_stats.R /api/publication/figures/
+
 COPY plumber.R /api/
 
 # Cloud Run injeta a porta via $PORT; 8080 e o default local

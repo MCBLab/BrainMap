@@ -1,12 +1,13 @@
 #!/usr/bin/env Rscript
 # Per-structure enrichment testing for VEGABrain.
 #
-# The maps paint a mean ssGSEA score per region and window. These functions add
-# the missing question: is that score *high enough to mean anything* in this
-# structure, in this window. Two tests, and a cell has to pass both.
+# The maps paint a mean score per region and window. These functions add the
+# missing question: is that score *high enough to mean anything* in this
+# structure, in this window. One competitive test, plus a donor guard:
 #
-#   competitive  is this gene set unusual among gene sets of the same size, here?
-#   spatial      is that consistent across donors, or is it one donor's tissue?
+#   competitive  in this cell, is the set's within-window deviation higher than
+#                that of random gene sets of the same size and expression level?
+#   guard        does that survive dropping any single donor?
 #
 # The unit of inference is the BrainSpan structure, never the ggseg parcel. The
 # atlas draws 29 parcels but BrainSpan only sampled 22 structures, so several
@@ -15,8 +16,24 @@
 # independent findings. Results are painted outward onto parcels only at the very
 # end, for display.
 #
-# Statistics are pure functions; the two score fetchers at the bottom are the
-# only I/O. build_stats_cache.R builds the reference these read.
+# History, so the reasoning is not lost. An earlier design ranked the query
+# against the 4,000 nearest-size MSigDB sets and gated it with a within-donor
+# label-permutation test. Both halves were wrong for the question asked:
+#   - Ranks within a population of curated sets are uniform by construction, so
+#     at most ~1% of sets can ever be called per cell, and a set had to be more
+#     regionally specific than 99.9% of MSigDB -- itself brain-structured. Only
+#     2% of real MSigDB sets produced any enriched cell.
+#   - The permutation test compared a structure with its donor's average over the
+#     other structures, which is dominated by cortex (11 of 16). Subcortical
+#     tissue differs from that average for *every* gene set: on arbitrary sets it
+#     passed 32% of subcortical cells and 4% of cortical ones. It filtered cortex
+#     out instead of checking donor consistency.
+# The random-gene null below is the standard competitive null of gene set
+# analysis, is calibrated (see validate_stats.R), calls about a third of real
+# MSigDB sets somewhere, and its cortical controls find cortex.
+#
+# Statistics are pure functions. The only inputs are the expression matrix and
+# its sample metadata (dados_otimizados.rds); there is no precomputed reference.
 
 suppressPackageStartupMessages({ library(dplyr) })
 
@@ -26,24 +43,37 @@ suppressPackageStartupMessages({ library(dplyr) })
 MIN_DONORS <- 3
 
 # The 3rd trimester's donors contribute 1, 1, 3, 15 and 15 samples, so its median
-# structure rests on two people and its smallest attainable p is 1.5e-3. It is
-# not null -- it rejects above the null rate -- but it must not be presented as
-# though it carried the same weight as the windows either side of it.
+# structure rests on two people. It is flagged, not suppressed.
 UNDERPOWERED_WINDOWS <- "3rd trimester (n = 5)"
 
+# GSVA's ssGSEA divides the whole score matrix by one global scalar, the range
+# over every gene set x every sample in that call. The precomputed ontology
+# tables were divided by the range over 18,646 sets, and this is that constant.
+# It is display-only: it puts a raw score on the legend scale the rest of the
+# paper's maps use. No p-value depends on it.
+K_PRE <- 39802.5579
 
-# ---- gene set size --------------------------------------------------------
-# Effective size, not length(): 2,894 of the 18,650 sets repeat symbols
-# (BIOCARTA_41BB_PATHWAY opens with ATF2 five times), and a symbol the matrix
-# does not carry contributes nothing to a score. Both inflate length() and would
-# push a set into the wrong size band.
-effective_sizes <- function(genesets, universe) {
-  vapply(genesets, function(g) length(intersect(unique(g), universe)), integer(1))
+
+# ---- cells ----------------------------------------------------------------
+# One row per sample with the four columns the statistics need, and the list of
+# populated (window, structure) cells with donor counts. The structure_mapped
+# filter is what restricts the design to structures the atlas can draw: 87 cells,
+# 70 with >= MIN_DONORS donors.
+cells_from_meta <- function(col_meta) {
+  meta <- col_meta %>%
+    filter(!is.na(structure_mapped), !is.na(broad_age)) %>%
+    distinct(column_num, donor_id, structure_original, broad_age) %>%
+    mutate(cell = paste(broad_age, structure_original, sep = " || "))
+  cells <- meta %>%
+    group_by(cell, broad_age, structure_original) %>%
+    summarise(n_donors = n_distinct(donor_id), .groups = "drop") %>%
+    as.data.frame()
+  list(meta = meta, cells = cells)
 }
 
 
 # ---- cell means -----------------------------------------------------------
-# scores: matrix [gene sets x samples], raw (unnormalised) ssGSEA.
+# scores: matrix [gene sets x samples], raw (unnormalised) scores.
 # meta:   one row per sample, columns column_num, structure_original, broad_age.
 # Returns [gene sets x cells] with a `cells` attribute describing the columns.
 cell_means <- function(scores, meta) {
@@ -54,7 +84,7 @@ cell_means <- function(scores, meta) {
   meta <- meta[match(keep, meta$column_num), ]
   idx  <- match(as.character(meta$column_num), colnames(scores))
 
-  # One matrix multiply rather than a split-apply: 18,646 x 524 by 524 x n_cells.
+  # One matrix multiply rather than a split-apply.
   ind <- model.matrix(~ 0 + factor(meta$cell))
   colnames(ind) <- levels(factor(meta$cell))
   A <- scores[, idx, drop = FALSE] %*% sweep(ind, 2, colSums(ind), "/")
@@ -69,8 +99,7 @@ cell_means <- function(scores, meta) {
 # ---- within-window centring ----------------------------------------------
 # Subtracting each window's own mean over structures is what makes the test
 # spatial. Centre globally instead and any gene set with a developmental trend
-# lights up every structure of its peak window -- GOBP_MYELIN_ASSEMBLY fires on
-# all eight adult structures at p = 0.002, which is a true statement about time
+# lights up every structure of its peak window -- a true statement about time
 # and a false one about place.
 within_window_delta <- function(A, cells) {
   Dw <- A
@@ -82,141 +111,221 @@ within_window_delta <- function(A, cells) {
 }
 
 
-# ---- size adjustment ------------------------------------------------------
-# ssGSEA spread falls ~2.2x from the smallest gene sets to the largest, so an
-# unadjusted score is mostly a statement about set size. A mean+sd model does not
-# fix it -- the tail is far thinner than Gaussian and unevenly so across sizes
-# (P(z > 1.645) ranges 0.003 to 0.034 where it should be 0.05), which is why the
-# adjustment is only a pre-whitening step and the p-value below is an empirical
-# rank, never a normal quantile.
-size_adjust <- function(Dw, log_eff, f = 0.3) {
-  # Fits are kept on the grid of distinct sizes as well as applied, so a gene
-  # list that was never in the reference can be placed on the same scale by
-  # interpolation instead of refitting 87 lowess curves per query.
-  grid <- sort(unique(log_eff))
-  R   <- Dw
-  loc_grid <- matrix(NA_real_, length(grid), ncol(Dw))
-  scl_grid <- matrix(NA_real_, length(grid), ncol(Dw))
-
-  for (j in seq_len(ncol(Dw))) {
-    lo  <- stats::lowess(log_eff, Dw[, j], f = f)
-    loc <- suppressWarnings(stats::approx(lo$x, lo$y, xout = log_eff, rule = 2)$y)
-    ls  <- stats::lowess(log_eff, abs(Dw[, j] - loc), f = f)
-    scl <- suppressWarnings(stats::approx(ls$x, ls$y, xout = log_eff, rule = 2)$y)
-    floor_scl <- stats::median(scl[scl > 0], na.rm = TRUE)
-    scl[!is.finite(scl) | scl <= 0] <- floor_scl
-    R[, j] <- (Dw[, j] - loc) / scl
-    loc_grid[, j] <- suppressWarnings(stats::approx(lo$x, lo$y, xout = grid, rule = 2)$y)
-    sg <- suppressWarnings(stats::approx(ls$x, ls$y, xout = grid, rule = 2)$y)
-    sg[!is.finite(sg) | sg <= 0] <- floor_scl
-    scl_grid[, j] <- sg
-  }
-  list(R = R, grid = grid, loc = loc_grid, scl = scl_grid)
-}
-
-
-# Place a query's within-window deltas on the reference's adjusted scale.
-size_adjust_query <- function(Dw_query, log_eff_query, fit) {
-  vapply(seq_along(Dw_query), function(j) {
-    loc <- suppressWarnings(stats::approx(fit$grid, fit$loc[, j], xout = log_eff_query, rule = 2)$y)
-    scl <- suppressWarnings(stats::approx(fit$grid, fit$scl[, j], xout = log_eff_query, rule = 2)$y)
-    (Dw_query[j] - loc) / scl
-  }, numeric(1))
-}
-
-
-# ---- competitive p --------------------------------------------------------
-# Rank the query against the k reference sets nearest it in log effective size.
+# ---- ssGSEA from rank tables ----------------------------------------------
+# GSVA's ssGSEA statistic (GSVA:::.fastRndWalk) is linear in per-gene terms:
+# with per-sample ranks R (ties averaged), weights Ra = R^alpha and C[g] = n -
+# position of g in decreasing order + 1,
+#   ES = sum_{g in S} Ra*C / sum_{g in S} Ra - (n(n+1)/2 - sum_{g in S} C) / (n - |S|).
+# So thousands of gene sets are three sparse-matrix products over tables that
+# are computed once. This reproduces GSVA::gsva(ssgseaParam(normalize = FALSE))
+# to relative error 1e-6 (validate_stats.R check 0), on the unfiltered matrix.
 #
-# k is a power/resolution trade-off with a hard floor: the smallest p this can
-# return is 1/(k+1), and after BH over ~70 cells the smallest reachable q is
-# 70/(k+1). At k = 1000 that is 0.070 -- above any sane threshold, so nothing
-# could ever be called significant. k = 4000 puts the floor at 0.0175.
-# `self` is the query's own row in the reference, when it has one. An ontology
-# term is a member of the library it is being compared against, and leaving it in
-# means it counts as a set that beat itself -- inflating every ontology p-value
-# by exactly one count while a user gene list, absent from the library, pays no
-# such penalty. Dropping it makes the two modes comparable and the +1 below the
-# ordinary permutation correction rather than a double one.
-p_competitive <- function(R_ref, log_eff_ref, r_query, eff_query, k = 4000, self = NULL) {
-  ord <- order(abs(log_eff_ref - log(eff_query)))
-  if (!is.null(self)) ord <- ord[ord != self]
-  band <- ord[seq_len(min(k, length(ord)))]
-  vapply(seq_along(r_query), function(j) {
-    (1 + sum(R_ref[band, j] >= r_query[j])) / (length(band) + 1)
-  }, numeric(1))
+# bins: mean-expression bin of every gene, for expression-matched null sets.
+# universe: the genes null sets may be drawn from (default: all rows). Pass the
+# union of MSigDB symbols so the null is made of the same kind of gene a curated
+# or user list is made of; the matrix's other ~30k rows (non-coding, poorly
+# annotated) are regionally noisier at the same mean expression and, used as
+# null, make the test conservative (3.2% vs 5% at size 15). Bin edges are
+# quantiles of the universe, so a query gene outside it still gets a bin.
+rank_tables <- function(matrix_dados, alpha = 0.25, n_bins = 50, universe = NULL) {
+  m  <- as.matrix(matrix_dados)
+  n  <- nrow(m)
+  Rk <- apply(m, 2, rank, ties.method = "average")
+  Cm <- apply(Rk, 2, function(r) {
+    o <- order(r, decreasing = TRUE)
+    cc <- integer(n); cc[o] <- n - seq_len(n) + 1L
+    cc
+  })
+  Ra <- Rk^alpha
+  dimnames(Ra) <- dimnames(Cm) <- dimnames(m)
+  mu <- rowMeans(m)
+  in_universe <- if (is.null(universe)) rep(TRUE, n) else rownames(m) %in% universe
+  edges <- quantile(mu[in_universe], probs = seq(0, 1, length.out = n_bins + 1))
+  edges[1] <- -Inf; edges[n_bins + 1] <- Inf
+  bins <- as.integer(cut(mu, edges, labels = FALSE, include.lowest = TRUE))
+  list(Ra = Ra, Cm = Cm, n = n, genes = rownames(m), bins = bins,
+       pool = which(in_universe))
+}
+
+# W: sparse 0/1 membership matrix [sets x genes] (Matrix::sparseMatrix), columns
+# in rt$genes order. Returns raw ES [sets x samples].
+ssgsea_from_ranks <- function(rt, W) {
+  W@x[] <- 1                                   # a gene drawn twice counts once
+  sz <- Matrix::rowSums(W)
+  n  <- rt$n
+  ES <- as.matrix(W %*% (rt$Ra * rt$Cm)) / as.matrix(W %*% rt$Ra) -
+        (n * (n + 1) / 2 - as.matrix(W %*% rt$Cm)) / (n - sz)
+  dimnames(ES) <- list(rownames(W), colnames(rt$Ra))
+  ES
+}
+
+# idx: gene indices, either one set (a vector) or k sets (a [k x |S|] matrix).
+membership <- function(idx, n) {
+  k <- if (is.matrix(idx)) nrow(idx) else 1L
+  Matrix::sparseMatrix(i = rep(seq_len(k), times = length(idx) / k),
+                       j = as.integer(idx), x = 1, dims = c(k, n))
 }
 
 
-# ---- spatial p ------------------------------------------------------------
-# Permute structure labels WITHIN each donor. Donor identity explains up to 88%
-# of within-window variance, and the design is unbalanced -- dorsal thalamus is
-# 1st-trimester-only, cerebellum drops out after the 2nd -- so shuffling labels
-# freely across a window would let "this donor ran hot" masquerade as "this
-# structure is enriched". Donor-centring first, then permuting inside the donor,
-# tests the only thing the data can speak to: whether a structure sits above its
-# own donor's average, repeatedly, across different donors.
-#
-# x: named numeric, one raw score per sample (names are column_num).
-p_spatial <- function(x, meta, B = 10000, seed = NULL) {
+# ---- random gene sets, expression-matched ---------------------------------
+# k null sets: each query gene replaced by a gene drawn from the same
+# mean-expression bin. The matching is load-bearing. Roughly half the matrix is
+# barely detected; a null drawn uniformly from it would be noise, narrower in
+# every cell than any real signature, and would call almost anything enriched.
+# pool: indices the null may use (default all). Returns an integer matrix [k x |S|].
+draw_matched <- function(bins, idx_query, k = 4000, seed = 1, pool = seq_along(bins)) {
   if (!is.null(seed)) set.seed(seed)
-  meta <- meta %>%
-    filter(!is.na(structure_original), !is.na(broad_age),
-           as.character(column_num) %in% names(x))
-  out <- list()
+  pools <- split(pool, bins[pool])
+  draws <- vapply(idx_query, function(i) {
+    pool <- pools[[as.character(bins[i])]]
+    pool[sample.int(length(pool), k, replace = TRUE)]
+  }, integer(k))
+  matrix(draws, nrow = k)
+}
 
-  for (w in unique(meta$broad_age)) {
-    mw <- meta[meta$broad_age == w, ]
-    # A donor sampled in only one structure has zero residual after centring and
-    # nothing left to permute; keeping them only dilutes.
-    multi <- names(which(tapply(mw$structure_original, mw$donor_id,
-                                function(s) length(unique(s))) > 1))
-    mw <- mw[mw$donor_id %in% multi, ]
-    if (nrow(mw) == 0) next
-
-    v <- x[as.character(mw$column_num)]
-    r <- v - ave(v, mw$donor_id, FUN = mean)
-    s <- factor(mw$structure_original)
-    d <- factor(mw$donor_id)
-
-    M <- model.matrix(~ 0 + s)
-    M <- sweep(M, 2, colSums(M), "/")          # column means
-    obs <- as.numeric(crossprod(M, r))
-
-    # B permutations at once: shuffle row order within donor, reuse M.
-    perm <- replicate(B, ave(seq_along(d), d, FUN = sample))
-    null <- crossprod(M, matrix(r[perm], nrow = length(r)))
-
-    out[[w]] <- data.frame(
-      broad_age          = w,
-      structure_original = levels(s),
-      T_obs              = obs,
-      p_spatial          = (1 + rowSums(null >= obs)) / (B + 1),
-      stringsAsFactors   = FALSE)
-  }
-  bind_rows(out)
+null_sets <- function(rt, idx_query, k = 4000, seed = 1) {
+  membership(draw_matched(rt$bins, idx_query, k, seed, pool = rt$pool), rt$n)
 }
 
 
-# ---- combine --------------------------------------------------------------
+# ---- weighted signatures --------------------------------------------------
+# A log2FC-weighted signature, score_j = sum_i w_i z_ij / sum_i |w_i|, is not an
+# ssGSEA score, so it gets the same null in its own currency: random
+# expression-matched gene sets carrying the query's weights.
+
+# Z-scores of every gene with variance, plus its mean-expression bin. ~200 MB
+# for the 47,808 x 524 matrix; build once and keep.
+weighted_reference <- function(matrix_dados, n_bins = 50, universe = NULL) {
+  m  <- as.matrix(matrix_dados)
+  mu <- rowMeans(m)
+  sd <- sqrt(rowSums((m - mu)^2) / (ncol(m) - 1))
+  ok <- is.finite(sd) & sd > 0
+  mu <- mu[ok]
+  in_universe <- if (is.null(universe)) rep(TRUE, sum(ok)) else rownames(m)[ok] %in% universe
+  edges <- quantile(mu[in_universe], probs = seq(0, 1, length.out = n_bins + 1))
+  edges[1] <- -Inf; edges[n_bins + 1] <- Inf
+  list(Z    = (m[ok, , drop = FALSE] - mu) / sd[ok],
+       bins = as.integer(cut(mu, edges, labels = FALSE, include.lowest = TRUE)),
+       pool = which(in_universe))
+}
+
+# k null sets, one row each, scored on every sample. Weights keep their position
+# in the signature; only the gene identities are drawn.
+weighted_null_scores <- function(wref, idx_query, w, k = 4000, seed = 1) {
+  draws <- draw_matched(wref$bins, idx_query, k, seed, pool = wref$pool)
+  W <- Matrix::sparseMatrix(i = rep(seq_len(k), times = length(idx_query)),
+                            j = as.integer(draws), x = rep(w, each = k),
+                            dims = c(k, nrow(wref$Z)))
+  S <- as.matrix(W %*% wref$Z) / sum(abs(w))
+  dimnames(S) <- list(NULL, colnames(wref$Z))
+  S
+}
+
+
+# ---- competitive p and BH -------------------------------------------------
 # BH over the whole family of tested cells for this gene set (~70), not per
 # window. Five per-window families would be more powerful but would run five
-# error budgets across one figure, taking the chance of at least one false cell
-# from 3% to 11%.
-#
-# The two tests are combined by intersection, not by pooling p-values. They are
-# dependent through the same cell means, and Fisher/Stouffer would let one very
-# small p carry a cell that fails the other test, which is exactly what the
-# second test exists to prevent.
+# error budgets across one figure.
 combine_and_adjust <- function(df, alpha = 0.05) {
   df %>%
     mutate(
       tested = .data$n_donors >= MIN_DONORS,
       q_competitive = ifelse(tested, p.adjust(ifelse(tested, p_competitive, NA), "BH"), NA),
-      q_spatial     = ifelse(tested, p.adjust(ifelse(tested, p_spatial,     NA), "BH"), NA),
-      enriched = !is.na(q_competitive) & !is.na(q_spatial) &
-                 q_competitive < alpha & q_spatial < alpha,
+      pass_competitive = !is.na(q_competitive) & q_competitive < alpha,
       underpowered_window = .data$broad_age %in% UNDERPOWERED_WINDOWS)
+}
+
+
+# ---- donor guard: leave one donor out -------------------------------------
+# "Is this one donor's tissue?" is answered directly: drop each donor of the cell
+# in turn, recompute the cell mean and the window mean for the query and for
+# every null set, and re-rank. A cell is robust if it stays below alpha every
+# time. This is a guard on cells that already passed BH, so it uses the nominal
+# alpha; it is not part of the multiplicity family. Unlike a within-donor label
+# permutation, it is tissue-neutral: the null sets share whatever baseline the
+# structure has.
+#
+# S: [1 + k, samples], row 1 the query. Returns one row per requested cell.
+loo_guard <- function(S, meta, which_cells, alpha = 0.05) {
+  A  <- cell_means(S, meta)
+  cl <- attr(A, "cells")
+  k  <- nrow(S) - 1
+  meta <- meta %>% mutate(cell = paste(broad_age, structure_original, sep = " || "))
+  out <- lapply(which_cells, function(cell) {
+    jc <- match(cell, cl$cell)
+    jw <- which(cl$broad_age == cl$broad_age[jc])
+    wm <- rowMeans(A[, jw, drop = FALSE])
+    mc <- meta[meta$cell == cell, ]
+    ns <- nrow(mc)
+    p_d <- vapply(split(as.character(mc$column_num), mc$donor_id), function(cols) {
+      Aj <- (A[, jc] * ns - rowSums(S[, cols, drop = FALSE])) / (ns - length(cols))
+      d  <- Aj - (wm + (Aj - A[, jc]) / length(jw))
+      (1 + sum(d[-1] >= d[1])) / (k + 1)
+    }, numeric(1))
+    data.frame(cell = cell, p_loo = max(p_d), stringsAsFactors = FALSE)
+  })
+  bind_rows(out) %>% mutate(robust = p_loo < alpha)
+}
+
+
+# ---- shared tail ----------------------------------------------------------
+# S: [1 + k, samples], row 1 the query. One row per cell of ref$cells.
+test_cells <- function(S, ref, alpha = 0.05) {
+  k  <- nrow(S) - 1
+  A  <- cell_means(S, ref$meta)
+  cl <- attr(A, "cells")
+  Dw <- within_window_delta(A, cl)
+  j  <- match(ref$cells$cell, cl$cell)
+  Dq <- Dw[1, j]
+  Dn <- Dw[-1, j, drop = FALSE]
+
+  st <- ref$cells %>%
+    mutate(mean_score          = A[1, j],
+           delta_within_window = Dq,
+           p_competitive       = (1 + colSums(Dn >= rep(Dq, each = k))) / (k + 1)) %>%
+    combine_and_adjust(alpha = alpha) %>%
+    mutate(p_loo = NA_real_, robust = NA)
+
+  hit <- which(st$pass_competitive)
+  if (length(hit)) {
+    g <- loo_guard(S, ref$meta, st$cell[hit], alpha = alpha)
+    st$p_loo[hit]  <- g$p_loo[match(st$cell[hit], g$cell)]
+    st$robust[hit] <- g$robust[match(st$cell[hit], g$cell)]
+  }
+  st %>% mutate(enriched = pass_competitive & !is.na(robust) & robust)
+}
+
+
+# ---- top level ------------------------------------------------------------
+# Gene list (ssGSEA). genes: symbols; those absent from the matrix are dropped.
+# The query's raw per-sample scores are attached as attr "query" so a caller
+# that also paints the map does not score the list twice.
+enrich <- function(ref, rt, genes, k = 4000, alpha = 0.05, seed = 1) {
+  idx <- match(unique(genes), rt$genes)
+  idx <- idx[!is.na(idx)]
+  if (length(idx) < 5) stop("need at least 5 genes present in the matrix; got ", length(idx))
+  W <- rbind(membership(idx, rt$n), null_sets(rt, idx, k, seed))
+  S <- ssgsea_from_ranks(rt, W)
+  st <- test_cells(S, ref, alpha = alpha)
+  attr(st, "query") <- S[1, ]
+  st
+}
+
+# Weighted signature. Genes without variance are dropped, as score_ponderado()
+# in plumber.R drops them.
+enrich_weighted <- function(ref, wref, genes, w, k = 4000, alpha = 0.05, seed = 1) {
+  idx  <- match(genes, rownames(wref$Z))
+  keep <- !is.na(idx)
+  idx <- idx[keep]; w <- w[keep]
+  if (length(idx) == 0) stop("none of the genes varies across samples")
+  if (sum(abs(w)) == 0) stop("all weights are zero")
+
+  x <- as.numeric(crossprod(wref$Z[idx, , drop = FALSE], w)) / sum(abs(w))
+  names(x) <- colnames(wref$Z)
+  S <- rbind(query = x, weighted_null_scores(wref, idx, w, k = k, seed = seed))
+  st <- test_cells(S, ref, alpha = alpha)
+  attr(st, "query") <- x
+  st
 }
 
 
@@ -231,76 +340,14 @@ paint_outward <- function(stats_df, mapeamento) {
                by = c("structure_original" = "structure_name"),
                relationship = "many-to-many") %>%
     group_by(broad_age, region) %>%
-    summarise(mean_ssGSEA = mean(mean_ssGSEA),
-              delta_within_window = mean(delta_within_window),
-              enriched     = any(enriched),
-              q_competitive = min(q_competitive, na.rm = TRUE),
-              q_spatial     = min(q_spatial,     na.rm = TRUE),
+    summarise(across(any_of(c("mean_score", "delta_within_window")), mean),
+              enriched      = any(enriched),
+              # untested cells are all-NA: min() would warn, Inf becomes NA below
+              q_competitive = suppressWarnings(min(q_competitive, na.rm = TRUE)),
+              p_loo         = suppressWarnings(min(p_loo, na.rm = TRUE)),
+              robust        = any(robust, na.rm = TRUE),
               n_structures  = n(),
               tested        = any(tested),
               .groups = "drop") %>%
-    mutate(across(c(q_competitive, q_spatial), ~ ifelse(is.finite(.x), .x, NA_real_)))
-}
-
-
-# ---- top level ------------------------------------------------------------
-# One gene set in, one row per (structure, window) out.
-#   ref      enrichment_reference.rds
-#   x        named numeric, raw per-sample ssGSEA (names are column_num)
-#   eff_size the query's effective size
-enrich <- function(ref, x, eff_size, B = 10000, alpha = 0.05, k = 4000, seed = 1,
-                   self = NULL) {
-  qm <- matrix(x, nrow = 1, dimnames = list("query", names(x)))
-  Aq <- cell_means(qm, ref$meta)
-  Aq <- as.numeric(Aq)[match(ref$cells$cell, attr(Aq, "cells")$cell)]
-
-  Dq <- Aq
-  for (w in unique(ref$cells$broad_age)) {
-    j <- which(ref$cells$broad_age == w)
-    Dq[j] <- Aq[j] - mean(Aq[j])
-  }
-  rq <- size_adjust_query(Dq, log(eff_size), ref$fit)
-
-  sp <- p_spatial(x, ref$meta, B = B, seed = seed)
-
-  ref$cells %>%
-    mutate(mean_ssGSEA_raw      = Aq,
-           mean_ssGSEA          = Aq / ref$K_PRE,
-           delta_within_window  = Dq,
-           size_adjusted_effect = rq,
-           p_competitive        = p_competitive(ref$fit$R, ref$log_eff, rq, eff_size,
-                                                k = k, self = self)) %>%
-    left_join(sp[, c("broad_age", "structure_original", "p_spatial")],
-              by = c("broad_age", "structure_original")) %>%
-    # A window where every donor sat in one structure yields no permutable
-    # residual; such cells cannot be spatially supported, so they fail rather
-    # than pass by default.
-    mutate(p_spatial = ifelse(is.na(p_spatial), 1, p_spatial)) %>%
-    combine_and_adjust(alpha = alpha)
-}
-
-
-# ---- raw per-sample scores for a query ------------------------------------
-# Precomputed set: pull its 524-row block and undo the normalisation, so it
-# lands on the same raw scale as the reference.
-scores_ontology <- function(geneset, ref, root = ".") {
-  txt <- system2("grep", c(shQuote(paste0("^", geneset, ",")),
-                           shQuote(file.path(root, "ontologyssGSEA.csv"))), stdout = TRUE)
-  if (length(txt) == 0) stop("gene set not in ontologyssGSEA.csv: ", geneset)
-  d <- utils::read.csv(text = paste(c("GeneSet,Amostra,Score_ssGSEA", txt), collapse = "\n"))
-  stats::setNames(d$Score_ssGSEA * ref$K_PRE, as.character(d$Amostra))
-}
-
-# User gene list: normalize = FALSE is what puts an on-demand score on the
-# reference's scale. With normalize = TRUE, GSVA would divide by the range of
-# this call alone -- one gene set -- and the result would not be comparable to
-# anything precomputed.
-scores_genelist <- function(genes, matrix_dados) {
-  valid <- intersect(unique(genes), rownames(matrix_dados))
-  if (length(valid) < 5) stop("need at least 5 genes present in the matrix; got ", length(valid))
-  res <- GSVA::gsva(GSVA::ssgseaParam(exprData = matrix_dados,
-                                      geneSets = list(UserSet = valid),
-                                      minSize = 1, normalize = FALSE), verbose = FALSE)
-  list(x = stats::setNames(as.numeric(res["UserSet", ]), colnames(res)),
-       eff = length(valid), missing = setdiff(unique(genes), valid))
+    mutate(across(c(q_competitive, p_loo), ~ ifelse(is.finite(.x), .x, NA_real_)))
 }

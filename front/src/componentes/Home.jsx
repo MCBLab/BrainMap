@@ -58,6 +58,8 @@ export default function Home() {
   const [historicoGenelist, setHistoricoGenelist] = useState([]);
   const [genesInvalidos, setGenesInvalidos] = useState([]);
   const [infoAssinatura, setInfoAssinatura] = useState(null);
+  // Asterisco nas estruturas enriquecidas (q < 0.05 nos dois testes da API).
+  const [marcarSignificancia, setMarcarSignificancia] = useState(true);
   const [mostrarModalGenes, setMostrarModalGenes] = useState(false);
 
   const [genesDaVia, setGenesDaVia] = useState([]);
@@ -142,6 +144,7 @@ export default function Home() {
       const params = new URLSearchParams();
       params.append('gene_string', textoListaGenes);
       params.append('escala', escalaRegiao);
+      params.append('significancia', String(marcarSignificancia));
 
       // 2. CHECAGEM RÁPIDA: Quem existe e quem não existe?
       const resValidacao = await fetch(`${API}/validate_genelist`, {
@@ -246,6 +249,7 @@ export default function Home() {
           const params = new URLSearchParams();
           params.append('gene_string', textoListaGenes);
           params.append('escala', escalaRegiao);
+          params.append('significancia', String(marcarSignificancia));
           opcoesFetch.method = 'POST';
           opcoesFetch.body = params;
         }
@@ -282,6 +286,7 @@ export default function Home() {
         const params = new URLSearchParams();
         params.append('gene_string', textoListaGenes);
         params.append('escala', escalaRegiao);
+        params.append('significancia', String(marcarSignificancia));
         opcoesFetch = { method: 'POST', body: params };
       }
 
@@ -464,6 +469,26 @@ export default function Home() {
                   placeholder={"SOX10\nTSPAN6\nGAD1"} 
                   className="w-full px-4 py-3 bg-white border border-transparent focus:border-[#58614c] rounded-lg text-sm font-mono outline-none resize-y"
                 ></textarea>
+
+                {/* Vale para a lista simples (ssGSEA) e para a ponderada por log2FC.
+                    A explicacao do asterisco tambem vai carimbada no proprio mapa. */}
+                <label className="mt-3 flex items-start gap-2 text-[11px] text-zinc-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={marcarSignificancia}
+                    onChange={(e) => setMarcarSignificancia(e.target.checked)}
+                    className="mt-0.5 accent-[#58614c]"
+                  />
+                  <span>
+                    <span className="block text-[10px] font-bold uppercase tracking-widest text-[#58614c]">
+                      Mark significance (*)
+                    </span>
+                    Asterisk on structures more enriched than expression-matched random
+                    gene sets (q &lt; 0.05), robust to leaving any single donor out.
+                    Needs at least 5 genes found in the data.
+                  </span>
+                </label>
+
                 <button 
                   onClick={gerarMapaLista}
                   className="w-full mt-4 bg-[#58614c] text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all"

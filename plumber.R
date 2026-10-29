@@ -2,7 +2,6 @@ library(plumber)
 library(dplyr)
 library(ggplot2)
 library(ggseg)
-library(GSVA)
 library(cowplot)
 
 #* @filter cors
@@ -34,6 +33,35 @@ regioes_por_macro <- meta_limpo %>%
 # 2. LISTAS OTIMIZADAS (À prova de falhas)
 setgene <- rownames(matrix_dados)
 setontologies <- sort(unique(ontologia_micro$GeneSet))
+
+# --- Significancia por estrutura (asteriscos no mapa) ------------------------
+# Mesma estatistica da publicacao (publication/figures/enrichment_stats.R): por
+# (estrutura, janela), o desvio da lista em relacao a media da janela e comparado
+# com o de 4.000 listas aleatorias de mesmo tamanho e mesmo nivel de expressao,
+# BH sobre as celulas testadas, e a celula ainda precisa continuar significativa
+# quando qualquer doador e retirado. Nao ha referencia pre-computada: tudo sai
+# da matriz de expressao e dos metadados das amostras.
+source("publication/figures/enrichment_stats.R")
+ref_enriquecimento <- cells_from_meta(dados_app$col_meta)
+
+# Tabelas de postos (ssGSEA por algebra, ~300 MB) e z-scores (assinatura
+# ponderada, ~200 MB): construidas na primeira vez em que alguem pedir, nao no
+# boot, que o Cloud Run cronometra. Com as tabelas de postos o ssGSEA de uma
+# lista sai em < 1 s, no lugar dos ~45 s do GSVA::gsva().
+# O nulo sorteia genes do universo do MSigDB (o mesmo tipo de gene de uma lista
+# curada ou de usuario), nao das ~30 mil linhas nao anotadas da matriz.
+universo_genes <- intersect(unique(unlist(genesets_list, use.names = FALSE)), setgene)
+cache_estat <- new.env()
+tabelas_rank <- function() {
+  if (is.null(cache_estat$rt)) cache_estat$rt <- rank_tables(matrix_dados, universe = universo_genes)
+  cache_estat$rt
+}
+referencia_ponderada <- function() {
+  if (is.null(cache_estat$wref)) cache_estat$wref <- weighted_reference(matrix_dados, universe = universo_genes)
+  cache_estat$wref
+}
+
+pediu_significancia <- function(x) tolower(as.character(x)) %in% c("true", "1", "yes", "sim")
 
 # Devolve (broad_age, region, Score_Medio_ssGSEA) para uma ontologia. Na escala
 # macro cada região recebe a média da macro-região a que pertence.
@@ -186,8 +214,46 @@ agrega_por_regiao <- function(score_por_amostra, escala, nome_col,
   dados_prontos
 }
 
+# Estatistica por (estrutura, janela) para a assinatura submetida. Devolve
+# list(celulas, motivo): `celulas` e a saida de enrich() / enrich_weighted(),
+# `motivo` explica, para a legenda, por que nao houve teste.
+significancia_assinatura <- function(assinatura) {
+  genes <- assinatura$validos$gene
+  if (length(genes) < 5) {
+    return(list(celulas = NULL,
+                motivo = sprintf("needs at least 5 genes found in the data (got %d)",
+                                 length(genes))))
+  }
+  celulas <- if (assinatura$ponderado) {
+    enrich_weighted(ref_enriquecimento, referencia_ponderada(), genes, assinatura$validos$peso)
+  } else {
+    enrich(ref_enriquecimento, tabelas_rank(), genes)
+  }
+  list(celulas = celulas, motivo = NULL)
+}
+
+# Parcelas que recebem asterisco: toda parcela alimentada por uma estrutura
+# enriquecida (paint_outward, a mesma regra da Fig. 6 da publicacao). A
+# inferencia e por estrutura do BrainSpan; a parcela so herda o veredito.
+marcas_significancia <- function(estat) {
+  if (is.null(estat$celulas)) return(NULL)
+  paint_outward(estat$celulas, dados_app$mapping_info$region_to_structure) %>%
+    filter(enriched) %>%
+    distinct(broad_age, region) %>%
+    mutate(broad_age = factor(broad_age, levels = ordem_idades))
+}
+
+legenda_significancia <- function(estat) {
+  if (is.null(estat)) return(NULL)
+  if (!is.null(estat$motivo)) return(paste0("Significance not tested: ", estat$motivo))
+  sprintf(paste0("* q < 0.05 vs 4,000 expression-matched random gene sets (BH over %d cells),\n",
+                 "robust to leaving any single donor out; %d enriched structure x window cells"),
+          sum(estat$celulas$tested), sum(estat$celulas$enriched))
+}
+
 # Score ponderado quando a lista trouxe log2FC, ssGSEA de sempre quando nao.
-scores_assinatura <- function(assinatura, escala) {
+# Com significancia = TRUE a lista devolve tambem `estat` (ver acima).
+scores_assinatura <- function(assinatura, escala, significancia = FALSE) {
   genes <- assinatura$validos$gene
   if (length(genes) == 0) {
     stop("Erro: Nenhum dos genes fornecidos foi encontrado na base de dados.")
@@ -195,21 +261,20 @@ scores_assinatura <- function(assinatura, escala) {
 
   if (assinatura$ponderado) {
     coluna <- "Score_Medio_Ponderado"
-    dados <- agrega_por_regiao(
-      score_ponderado(genes, assinatura$validos$peso), escala, coluna)
+    dados <- agrega_por_regiao(score_ponderado(genes, assinatura$validos$peso), escala, coluna)
   } else {
     coluna <- "Score_Medio_ssGSEA"
-    ssgsea_parametros <- GSVA::ssgseaParam(
-      exprData = as.matrix(matrix_dados),
-      geneSets = list(UserSet = genes)
-    )
-    ssgsea_resultado <- GSVA::gsva(ssgsea_parametros, verbose = FALSE)
-    dados <- agrega_por_regiao(
-      as.numeric(ssgsea_resultado["UserSet", ]), escala, coluna,
-      colnames(ssgsea_resultado))
+    # O mesmo ssGSEA do GSVA::gsva(), calculado por algebra sobre as tabelas de
+    # postos (identico a 1e-6, ver validate_stats.R). GSVA normaliza dividindo
+    # pela amplitude do proprio conjunto; refeito aqui, identico, para a exibicao.
+    rt <- tabelas_rank()
+    por_amostra <- ssgsea_from_ranks(rt, membership(match(genes, rt$genes), rt$n))[1, ]
+    dados <- agrega_por_regiao(por_amostra / diff(range(por_amostra)), escala, coluna,
+                               names(por_amostra))
   }
 
-  list(dados = dados, coluna = coluna)
+  estat <- if (significancia) significancia_assinatura(assinatura) else NULL
+  list(dados = dados, coluna = coluna, estat = estat)
 }
 #* @get /list_genes
 function() {
@@ -222,10 +287,82 @@ function() {
 }
 
 # Helper function to create the lateral and medial brain plots grid
-build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
-  p_lateral <- data %>%
-    ggplot() +
+# Onde cai o asterisco: um ponto interior do maior poligono de cada parcela,
+# calculado sobre a geometria ja reposicionada que o ggseg desenha naquela vista
+# -- por isso ha um ramo por versao do ggseg. Hemisferios desenhados um sobre o
+# outro (o cerebelo na vista sagital) viram um ponto so.
+centroides_parcelas <- function(atlas, pos) {
+  # Um ponto garantidamente DENTRO do poligono (sf::st_point_on_surface): o
+  # centroide cai fora em parcelas finas e curvas (superior parietal, occipital
+  # lateral na vista medial).
+  medir <- function(pg, region, hemi, view) {
+    bb <- sf::st_bbox(pg)
+    pt <- tryCatch(sf::st_coordinates(suppressWarnings(sf::st_point_on_surface(pg))),
+                   error = function(e) sf::st_coordinates(sf::st_centroid(pg)))
+    tibble(region = region, hemi = hemi, view = view, area = as.numeric(sf::st_area(pg)),
+           x = pt[1, 1], y = pt[1, 2],
+           xmin = bb[["xmin"]], xmax = bb[["xmax"]], ymin = bb[["ymin"]], ymax = bb[["ymax"]])
+  }
+  if (exists("prepare_polygon_atlas", envir = asNamespace("ggseg"), inherits = FALSE)) {
+    # ggseg >= 2.2 desenha poligonos planos (x, y)
+    plano <- ggseg:::prepare_polygon_atlas(atlas, position = position_brain(pos)) %>%
+      filter(!is.na(region)) %>%
+      mutate(chave = paste(region, hemi, .feature_id, subgroup, sep = "|"))
+    aneis <- bind_rows(lapply(split(plano, plano$chave), function(d) {
+      xy <- cbind(d$x, d$y)
+      if (any(xy[1, ] != xy[nrow(xy), ])) xy <- rbind(xy, xy[1, ])
+      medir(sf::st_sfc(sf::st_polygon(list(xy))), d$region[1], d$hemi[1], d$view[1])
+    }))
+  } else {
+    # ggseg 2.1.x (fixado no Dockerfile) desenha geometria sf reposicionada
+    rep <- ggseg::reposition_brain(as.data.frame(atlas), position = pos)
+    rep <- rep[!is.na(rep$region), ]
+    geo <- sf::st_geometry(rep)
+    aneis <- bind_rows(lapply(seq_len(nrow(rep)), function(i) {
+      polys <- suppressWarnings(sf::st_cast(geo[i], "POLYGON"))
+      bind_rows(lapply(seq_along(polys), function(k) medir(polys[k], rep$region[i], rep$hemi[i], rep$view[i])))
+    }))
+  }
+  # a parcel that is only a sliver in this view (precentral seen from the medial
+  # side: 0.05% of the panel) is starred where it is actually drawn, not here
+  area_vista <- (max(aneis$xmax) - min(aneis$xmin)) * (max(aneis$ymax) - min(aneis$ymin))
+  aneis %>%
+    group_by(region, hemi, view) %>%
+    slice_max(area, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    filter(area >= 0.0025 * area_vista) %>%
+    group_by(region, view) %>%
+    # os dois hemisferios ficam so quando as caixas nao se sobrepoem
+    filter(n() == 1 | max(xmin) > min(xmax) | max(ymin) > min(ymax) | area == max(area)) %>%
+    ungroup() %>%
+    select(region, hemi, view, x, y)
+}
+
+
+# Camada de asteriscos: `marcas` tem (broad_age, region), uma linha por parcela
+# enriquecida por janela. Glifo branco sobre um halo escuro, para ler em cima de
+# qualquer tom da paleta. NULL quando nao ha o que marcar (somar NULL a um
+# ggplot nao faz nada).
+camada_asteriscos <- function(marcas, atlas, pos, tamanho = 9) {
+  if (is.null(marcas) || nrow(marcas) == 0) return(NULL)
+  pontos <- marcas %>%
+    inner_join(centroides_parcelas(atlas, pos), by = "region", relationship = "many-to-many")
+  if (nrow(pontos) == 0) return(NULL)
+  list(
+    geom_text(data = pontos, aes(x = x, y = y), inherit.aes = FALSE, label = "*",
+              size = tamanho * 1.2, colour = "grey20", fontface = "bold", vjust = 0.3),
+    geom_text(data = pontos, aes(x = x, y = y), inherit.aes = FALSE, label = "*",
+              size = tamanho, colour = "white", fontface = "bold", vjust = 0.3)
+  )
+}
+
+# Os dados vao explicitamente para o geom_brain, agrupados pela faceta: o ggseg
+# >= 2.2 deixou de ler os dados do ggplot(), e na 2.1.x o resultado e o mesmo.
+build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL, marcas = NULL) {
+  data <- group_by(data, broad_age)
+  p_lateral <- ggplot() +
     geom_brain(
+      data = data,
       atlas = ggseg::dk(),
       position = position_brain(c("right lateral")),
       mapping = aes(fill = .data[[fill_var]]),
@@ -233,6 +370,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       size = 0.50
     ) +
     fill_scale +
+    camada_asteriscos(marcas, ggseg::dk(), "right lateral") +
     facet_wrap(~broad_age, ncol = 5) +
     theme_void() +
     theme(
@@ -243,9 +381,9 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       plot.background = element_rect(fill = "white", colour = NA)
     )
 
-  p_medial <- data %>%
-    ggplot() +
+  p_medial <- ggplot() +
     geom_brain(
+      data = data,
       atlas = ggseg::dk(),
       position = position_brain(c("right medial")),
       mapping = aes(fill = .data[[fill_var]]),
@@ -253,6 +391,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       size = 0.50
     ) +
     fill_scale +
+    camada_asteriscos(marcas, ggseg::dk(), "right medial") +
     facet_wrap(~broad_age, ncol = 5) +
     theme_void() +
     theme(
@@ -264,9 +403,9 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       plot.background = element_rect(fill = "white", colour = NA)
     )
 
-    p_sagittal <- data %>%
-    ggplot() +
+    p_sagittal <- ggplot() +
     geom_brain(
+      data = data,
       atlas = ggseg::aseg(),
       position = position_brain(c("sagittal")),
       mapping = aes(fill = .data[[fill_var]]),
@@ -274,6 +413,7 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       size = 0.50
     ) +
     fill_scale +
+    camada_asteriscos(marcas, ggseg::aseg(), "sagittal") +
     facet_wrap(~broad_age, ncol = 5) +
     theme_void() +
     theme(
@@ -285,9 +425,9 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       plot.background = element_rect(fill = "white", colour = NA)
     )
 
-    p_coronal <- data %>%
-    ggplot() +
+    p_coronal <- ggplot() +
     geom_brain(
+      data = data,
       atlas = ggseg::aseg(),
       position = position_brain(c("coronal_1")),
       mapping = aes(fill = .data[[fill_var]]),
@@ -295,6 +435,8 @@ build_brain_grid <- function(data, fill_var, fill_scale, caption_text = NULL) {
       size = 0.50
     ) +
     fill_scale +
+    # parcelas pequenas e proximas: glifo menor para nao se sobreporem
+    camada_asteriscos(marcas, ggseg::aseg(), "coronal_1", tamanho = 6) +
     facet_wrap(~broad_age, ncol = 5) +
     labs(caption = caption_text) +
     theme_void() +
@@ -402,9 +544,9 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
   print(grafico_ontologia(geneset, escala))
 }
 
-grafico_genelist <- function(gene_string = "", escala = "micro") {
+grafico_genelist <- function(gene_string = "", escala = "micro", significancia = FALSE) {
   assinatura <- assinatura_valida(gene_string)
-  resultado <- scores_assinatura(assinatura, escala)
+  resultado <- scores_assinatura(assinatura, escala, significancia)
 
   if (assinatura$ponderado) {
     # O score soma zero entre as amostras por construcao, entao limites
@@ -441,23 +583,31 @@ grafico_genelist <- function(gene_string = "", escala = "micro") {
     legenda <- NULL
   }
 
-  build_brain_grid(resultado$dados, resultado$coluna, escala_cor, legenda)
+  # A nota de significancia entra na mesma legenda carimbada no mapa: uma imagem
+  # baixada tem de dizer sozinha o que o asterisco quer dizer.
+  legenda <- c(legenda, legenda_significancia(resultado$estat))
+  if (length(legenda) == 0) legenda <- NULL else legenda <- paste(legenda, collapse = "\n")
+
+  build_brain_grid(resultado$dados, resultado$coluna, escala_cor, legenda,
+                   marcas = marcas_significancia(resultado$estat))
 }
 
 #* Plota o mapa cerebral baseado no ssGSEA de uma lista CUSTOMIZADA de genes (SVG)
 #* @param gene_string Uma string de genes
+#* @param significancia "true" marca com * as estruturas enriquecidas (q < 0.05)
 #* @serializer svg list(width = 11, height = 7)
 #* @post /plot_genelist
-function(gene_string = "", escala = "micro") {
-  print(grafico_genelist(gene_string, escala))
+function(gene_string = "", escala = "micro", significancia = "false") {
+  print(grafico_genelist(gene_string, escala, pediu_significancia(significancia)))
 }
 
 #* Mesmo mapa do /plot_genelist, em PNG
 #* @param gene_string Uma string de genes
+#* @param significancia "true" marca com * as estruturas enriquecidas (q < 0.05)
 #* @serializer png list(width = 11, height = 7, units = "in", res = 150)
 #* @post /plot_genelist_png
-function(gene_string = "", escala = "micro") {
-  print(grafico_genelist(gene_string, escala))
+function(gene_string = "", escala = "micro", significancia = "false") {
+  print(grafico_genelist(gene_string, escala, pediu_significancia(significancia)))
 }
 
 #* Baixar dados do mapa de Gene Único
@@ -510,16 +660,28 @@ function(geneset = "GOBP_FOREBRAIN_GENERATION_OF_NEURONS", escala = "micro") {
 
 #* Baixar dados da Lista Customizada
 #* @param gene_string
+#* @param significancia "true" acrescenta tested / enriched / q_competitive / p_loo por regiao
 #* @serializer csv
 #* @post /data_genelist
-function(gene_string = "", escala = "micro") {
+function(gene_string = "", escala = "micro", significancia = "false") {
   assinatura <- assinatura_valida(gene_string)
 
   if (nrow(assinatura$validos) == 0) {
     return(data.frame(Erro = "Nenhum gene valido"))
   }
 
-  return(scores_assinatura(assinatura, escala)$dados)
+  resultado <- scores_assinatura(assinatura, escala, pediu_significancia(significancia))
+  dados <- resultado$dados
+  if (!is.null(resultado$estat$celulas)) {
+    # Mesma regra do mapa: a regiao herda o veredito da(s) estrutura(s) que a
+    # alimentam; o q reportado e o menor entre elas.
+    por_regiao <- paint_outward(resultado$estat$celulas,
+                                dados_app$mapping_info$region_to_structure) %>%
+      transmute(broad_age = factor(broad_age, levels = ordem_idades), region,
+                tested, enriched, q_competitive, p_loo)
+    dados <- left_join(dados, por_regiao, by = c("broad_age", "region"))
+  }
+  dados
 }
 
 #* Verifica quais genes da lista existem no banco de dados

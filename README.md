@@ -51,6 +51,9 @@ The API also requires the `ontologyssGSEA.csv` file to serve the pathway visuali
 
 This will load the optimized data, fetch gene sets from `msigdbr`, run the GSVA calculations, and output the final `ontologyssGSEA.csv` file to your root directory.
 
+### 3. Significance asterisks (no build step)
+The Gene List tab can mark structures that are significantly enriched for the submitted list: an asterisk on the map, and `tested / enriched / q_competitive / p_loo` columns in the CSV, via `significancia=true` on the `/plot_genelist*` and `/data_genelist` endpoints. For each (structure, age window) the list's deviation from the window mean is ranked against 4,000 random gene sets of the same size and expression level, BH-adjusted over the tested cells, and a cell is kept only if it stays significant after leaving any single donor out. Everything is computed from `dados_otimizados.rds` at request time (about 1 s); there is no reference file to build. The statistics live in `publication/figures/enrichment_stats.R` and their calibration in `publication/figures/validate_stats.R`.
+
 ## 🏃 Running the Application
 
 Once the data is prepared, you can launch the app:
